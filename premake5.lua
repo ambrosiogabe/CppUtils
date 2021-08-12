@@ -35,14 +35,14 @@ project "Logger"
     }
 
     filter { "configurations:SingleIncludeTest" }
-        defines { "_DEBUG", "GABE_LOGGER_IMPL", "SINGLE_INCLUDE_TEST" }
+        defines { "_DEBUG", "SINGLE_INCLUDE_TEST" }
         symbols "On"
         removefiles { "logger/**" }
         includedirs { "single_include" }
         files { "logger/main.cpp" }
 
     filter { "configurations:Test" }
-        defines { "_DEBUG", "GABE_LOGGER_UNDEFINED_IMPL" }
+        defines { "_DEBUG", "GABE_LOGGER_IMPL" }
         symbols "On"
 
     filter { "system:Unix", "system:Mac" }

@@ -1,4 +1,4 @@
-#if defined(GABE_LOGGER_UNDEFINED_IMPL) || defined(GABE_LOGGER_IMPL)
+#ifdef GABE_LOGGER_IMPL
 #ifdef _WIN32
 #include <stdio.h>
 #include <varargs.h>

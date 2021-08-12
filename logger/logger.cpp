@@ -1,4 +1,4 @@
-#if defined(GABE_LOGGER_UNDEFINED_IMPL) || defined(GABE_LOGGER_IMPL)
+#ifdef GABE_LOGGER_IMPL
 #include "logger.h"
 
 static g_logger_level log_level = g_logger_level::All;
