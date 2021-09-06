@@ -1,22 +1,20 @@
-workspace "Logger"
+workspace "CppUtils"
     architecture "x64"
 
     configurations {
-        "Test",
-        "SingleIncludeTest"
+        "Test"
     }
 
-    startproject "Logger"
+    startproject "CppUtils"
 
 -- This is a helper variable, to concatenate the sys-arch
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
-project "Logger"
+project "CppUtils"
     kind "ConsoleApp"
     language "C++"
     cppdialect "C++17"
     staticruntime "on"
-    targetsuffix "_Test"
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
     objdir ("bin-int/" .. outputdir .. "/%{prj.name}")
@@ -25,24 +23,11 @@ project "Logger"
     debugdir(outputPath)
 
 	files {
-        "logger/**.hpp",
-        "logger/**.cpp",
-        "logger/**.h"
+        "single_include/cppUtils/cppUtils.hpp"
     }
-
-    includedirs {
-        "logger"
-    }
-
-    filter { "configurations:SingleIncludeTest" }
-        defines { "_DEBUG", "SINGLE_INCLUDE_TEST" }
-        symbols "On"
-        removefiles { "logger/**" }
-        includedirs { "single_include" }
-        files { "logger/main.cpp" }
 
     filter { "configurations:Test" }
-        defines { "_DEBUG", "GABE_LOGGER_IMPL" }
+        defines { "_DEBUG", "GABE_CPP_UTILS_TEST_MAIN", "GABE_CPP_UTILS_IMPL" }
         symbols "On"
 
     filter { "system:Unix", "system:Mac" }
