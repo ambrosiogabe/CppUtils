@@ -23,7 +23,12 @@ project "CppUtils"
     debugdir(outputPath)
 
 	files {
-        "single_include/cppUtils/cppUtils.hpp"
+        "single_include/cppUtils/cppUtils.hpp",
+        "single_include/cppUtils/**.cpp"
+    }
+
+    includedirs {
+        "single_include"
     }
 
     filter { "configurations:Test" }
