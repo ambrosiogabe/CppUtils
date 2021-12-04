@@ -170,6 +170,7 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 			{
 				iterator->references++;
 				iterator->fileAllocator = filename;
+				iterator->memorySize = numBytes;
 				iterator->fileAllocatorLine = line;
 				iterator->memory = memory;
 			}
@@ -234,6 +235,7 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 				{
 					newMemoryIter->references++;
 					newMemoryIter->fileAllocator = filename;
+					newMemoryIter->memorySize = numBytes;
 					newMemoryIter->fileAllocatorLine = line;
 					newMemoryIter->memory = newMemory;
 				}
