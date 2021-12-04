@@ -191,16 +191,28 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 {
 	if (trackMemoryAllocations)
 	{
-		// In memory error tracking mode, I'll add sentinel values to the beginning and
-		// end of the block of memory to ensure it doesn't have any errors on free
 		numBytes += bufferPadding * 2;
 		oldMemory = (void*)((uint8*)oldMemory - bufferPadding);
 		void* newMemory = std::realloc(oldMemory, numBytes);
 
+		// In memory error tracking mode, I'll add sentinel values to the beginning and
+		// end of the block of memory to ensure it doesn't have any errors on free
+		auto oldMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, oldMemory });
+		if (oldMemoryIter == allocations.end())
+		{
+			g_logger_error("Tried to reallocate a block of memory that was not allocated by this library.");
+			return nullptr;
+		}
+		if (newMemory)
+		{
+			// Move the old sentinel values that were at the end to the end of the new memory block
+			size_t oldSize = oldMemoryIter->memorySize;
+			std::memmove((uint8*)newMemory + numBytes - bufferPadding, (void*)((uint8*)newMemory + oldSize - bufferPadding), bufferPadding);
+		}
+
 		std::lock_guard<std::mutex> lock(memoryMtx);
 		// If we are in a debug build, track all memory allocations to see if we free them all as well
 		auto newMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, newMemory });
-		auto oldMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, oldMemory });
 		if (newMemoryIter != oldMemoryIter)
 		{
 			// Realloc could not expand the current pointer, so it allocated a new memory block
