@@ -207,7 +207,7 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 		{
 			// Move the old sentinel values that were at the end to the end of the new memory block
 			size_t oldSize = oldMemoryIter->memorySize;
-			std::memmove((uint8*)newMemory + numBytes - bufferPadding, (void*)((uint8*)newMemory + oldSize - bufferPadding), bufferPadding);
+			std::memmove((uint8*)newMemory + numBytes - bufferPadding, (void*)((uint8*)newMemory + oldSize - bufferPadding), bufferPadding * sizeof(uint8));
 		}
 
 		std::lock_guard<std::mutex> lock(memoryMtx);
