@@ -26,7 +26,7 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes);
 void* _g_memory_realloc(const char* filename, int line, void* memory, size_t newSize);
 void _g_memory_free(const char* filename, int line, void* memory);
 
-void g_memory_init(bool detectMemoryLeaks);
+void g_memory_init(bool detectMemoryLeaks, uint16 bufferPadding = 5);
 void g_memory_dumpMemoryLeaks();
 
 int g_memory_compareMem(void* a, void* b, size_t numBytes);
@@ -90,6 +90,7 @@ g_logger_level g_logger_get_level();
 #include <stdlib.h>
 #include <chrono>
 #include <thread>
+#include <array>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -104,6 +105,7 @@ struct DebugMemoryAllocation
 	const char* fileAllocator;
 	int fileAllocatorLine;
 	int references;
+	size_t memorySize;
 	void* memory;
 
 	bool operator==(const DebugMemoryAllocation& other) const
@@ -115,23 +117,47 @@ struct DebugMemoryAllocation
 static std::mutex memoryMtx;
 static std::vector<DebugMemoryAllocation> allocations;
 static bool trackMemoryAllocations = false;
+static const std::array<uint8, 5> specialMemoryFlags = { (uint8)0xcd, (uint8)0xab, (uint8)0x12, (uint8)0x34, (uint8)0x98 };
+static uint16 bufferPadding = 5;
 
-void g_memory_init(bool detectMemoryLeaks)
+void g_memory_init(bool detectMemoryErrors, uint16 inBufferPadding)
 {
-	trackMemoryAllocations = detectMemoryLeaks;
+	trackMemoryAllocations = detectMemoryErrors;
+	bufferPadding = inBufferPadding;
 }
 
 void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 {
-	void* memory = std::malloc(numBytes);
-	if (trackMemoryAllocations)
+	if (trackMemoryAllocations) 
 	{
+		// In memory error tracking mode, I'll add sentinel values to the beginning and
+		// end of the block of memory to ensure it doesn't have any errors on free
+		numBytes += (bufferPadding * 2);
+
+		// In debug mode we allocate 10 extra bytes, 5 before the block and 5 after. We can use these to detect
+		// Buffer overruns or underruns
+		void* memory = std::malloc(numBytes);
+		if (memory) 
+		{
+			uint8* memoryBytes = (uint8*)memory;
+			for (int i = 0; i < bufferPadding; i++) 
+			{
+				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlags.size()];
+			}
+
+			memoryBytes = ((uint8*)memory) + numBytes - bufferPadding;
+			for (int i = 0; i < bufferPadding; i++)
+			{
+				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlags.size()];
+			}
+		}
+
 		std::lock_guard<std::mutex> lock(memoryMtx);
 		// If we are in a debug build, track all memory allocations to see if we free them all as well
-		auto iterator = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, memory });
+		auto iterator = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, memory });
 		if (iterator == allocations.end())
 		{
-			allocations.emplace_back(DebugMemoryAllocation{ filename, line, 1, memory });
+			allocations.emplace_back(DebugMemoryAllocation{ filename, line, 1, numBytes, memory });
 		}
 		else
 		{
@@ -147,19 +173,40 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 				g_logger_error("Tried to allocate memory that has already been allocated... This should never be hit. If it is, we have a problem.");
 			}
 		}
+
+		return (void*)((uint8*)memory + bufferPadding);
 	}
-	return memory;
+
+	// If we aren't tracking memory, just return malloc
+	return std::malloc(numBytes);
 }
 
 void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t numBytes)
 {
-	void* newMemory = std::realloc(oldMemory, numBytes);
 	if (trackMemoryAllocations)
 	{
+		// In memory error tracking mode, I'll add sentinel values to the beginning and
+		// end of the block of memory to ensure it doesn't have any errors on free
+		numBytes += bufferPadding * 2;
+		oldMemory = (void*)((uint8*)oldMemory - bufferPadding);
+		void* newMemory = std::realloc(oldMemory, numBytes);
+
+		// In debug mode we allocate 10 extra bytes, 5 before the block and 5 after. We can use these to detect
+		// Buffer overruns or underruns
+		void* memory = g_memory_allocate(numBytes);
+		if (memory)
+		{
+			uint8* memoryBytes = (uint8*)memory + numBytes - bufferPadding;
+			for (int i = 0; i < bufferPadding; i++)
+			{
+				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlags.size()];
+			}
+		}
+
 		std::lock_guard<std::mutex> lock(memoryMtx);
 		// If we are in a debug build, track all memory allocations to see if we free them all as well
-		auto newMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, newMemory });
-		auto oldMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, oldMemory });
+		auto newMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, newMemory });
+		auto oldMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, oldMemory });
 		if (newMemoryIter != oldMemoryIter)
 		{
 			// Realloc could not expand the current pointer, so it allocated a new memory block
@@ -174,7 +221,7 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 
 			if (newMemoryIter == allocations.end())
 			{
-				allocations.emplace_back(DebugMemoryAllocation{ filename, line, 1, newMemory });
+				allocations.emplace_back(DebugMemoryAllocation{ filename, line, 1, numBytes, newMemory });
 			}
 			else
 			{
@@ -192,16 +239,20 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 			}
 		}
 		// If realloc expanded the memory in-place, then we don't need to do anything because no "new" memory locations were allocated
+		return (void*)((uint8*)newMemory + bufferPadding);
 	}
-	return newMemory;
+
+	// If we're not tracking allocations, just return realloc
+	return std::realloc(oldMemory, numBytes);;
 }
 
 void _g_memory_free(const char* filename, int line, void* memory)
 {
 	if (trackMemoryAllocations)
 	{
+		memory = (void*)((uint8*)memory - bufferPadding);
 		std::lock_guard<std::mutex> lock(memoryMtx);
-		auto iterator = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, memory });
+		auto iterator = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, 0, memory });
 		if (iterator == allocations.end())
 		{
 			g_logger_error("Tried to free invalid memory that was never allocated at '%s' line: %d", filename, line);
@@ -215,6 +266,30 @@ void _g_memory_free(const char* filename, int line, void* memory)
 		else
 		{
 			iterator->references--;
+			
+			if (iterator->references == 0)
+			{
+				// Check to see if our special flags were changed. If they were, we have heap corruption!
+				uint8* memoryBytes = (uint8*)memory;
+				for (int i = 0; i < bufferPadding; i++)
+				{
+					if (memoryBytes[i] != specialMemoryFlags[i % specialMemoryFlags.size()])
+					{
+						g_logger_warning("Heap corruption detected. Buffer underrun in memory allocated from: '%s' line: %d", iterator->fileAllocator, iterator->fileAllocatorLine);
+						break;
+					}
+				}
+
+				memoryBytes = (uint8*)memory + iterator->memorySize - bufferPadding;
+				for (int i = 0; i < bufferPadding; i++)
+				{
+					if (memoryBytes[i] != specialMemoryFlags[i % specialMemoryFlags.size()]) 
+					{
+						g_logger_warning("Heap corruption detected. Buffer overrun in memory allocated from: '%s' line: %d", iterator->fileAllocator, iterator->fileAllocatorLine);
+						break;
+					}
+				}
+			}
 		}
 	}
 
@@ -230,7 +305,7 @@ void g_memory_dumpMemoryLeaks()
 	{
 		if (alloc.references > 0)
 		{
-			g_logger_warning("Memory leak detected. Allocated from: '%s' line: %d", alloc.fileAllocator, alloc.fileAllocatorLine);
+			g_logger_warning("Memory leak detected. Leaked '%zu' bytes allocated from: '%s' line: %d", alloc.memorySize - 10, alloc.fileAllocator, alloc.fileAllocatorLine);
 		}
 	}
 }
@@ -520,13 +595,21 @@ void main()
 	g_logger_warning("A warning!");
 	g_logger_error("This is an error...");
 
-	g_memory_init(true);
+	g_memory_init(true, 1024);
 
 	// Untracked memory allocation, we should be warned.
-	g_memory_allocate(sizeof(char) * 1024);
+	g_memory_allocate(sizeof(char) * 1025);
 
 	void* someMemory = g_memory_allocate(sizeof(char) * 1024);
 	g_memory_free(someMemory);
+
+	uint8* memoryCorruptionBufferUnderrun = (uint8*)g_memory_allocate(sizeof(char) * 357);
+	memoryCorruptionBufferUnderrun[-506] = 'h';
+	g_memory_free(memoryCorruptionBufferUnderrun);
+
+	uint8* memoryCorruptionBufferOverrun = (uint8*)g_memory_allocate(sizeof(char) * 312);
+	memoryCorruptionBufferOverrun[312 + 809] = 'a';
+	g_memory_free(memoryCorruptionBufferOverrun);
 
 	g_memory_dumpMemoryLeaks();
 
