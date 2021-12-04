@@ -197,18 +197,6 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 		oldMemory = (void*)((uint8*)oldMemory - bufferPadding);
 		void* newMemory = std::realloc(oldMemory, numBytes);
 
-		// In debug mode we allocate 10 extra bytes, 5 before the block and 5 after. We can use these to detect
-		// Buffer overruns or underruns
-		void* memory = g_memory_allocate(numBytes);
-		if (memory)
-		{
-			uint8* memoryBytes = (uint8*)memory + numBytes - bufferPadding;
-			for (int i = 0; i < bufferPadding; i++)
-			{
-				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlags.size()];
-			}
-		}
-
 		std::lock_guard<std::mutex> lock(memoryMtx);
 		// If we are in a debug build, track all memory allocations to see if we free them all as well
 		auto newMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, newMemory });

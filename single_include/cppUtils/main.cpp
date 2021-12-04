@@ -28,6 +28,7 @@ void main()
 
 	uint8* memoryCorruptionBufferOverrun = (uint8*)g_memory_allocate(sizeof(char) * 312);
 	memoryCorruptionBufferOverrun[312 + 809] = 'a';
+	memoryCorruptionBufferOverrun = (uint8*)g_memory_realloc(memoryCorruptionBufferOverrun, sizeof(char) * 543);
 	g_memory_free(memoryCorruptionBufferOverrun);
 
 	g_memory_dumpMemoryLeaks();
