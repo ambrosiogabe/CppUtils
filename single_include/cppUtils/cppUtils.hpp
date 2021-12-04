@@ -122,7 +122,7 @@ struct DebugMemoryAllocation
 static std::mutex memoryMtx;
 static std::vector<DebugMemoryAllocation> allocations;
 static bool trackMemoryAllocations = false;
-static const std::array<uint8, 5> specialMemoryFlags = { (uint8)0xcd, (uint8)0xab, (uint8)0x12, (uint8)0x34, (uint8)0x98 };
+static const std::array<uint8, 8> specialMemoryFlags = { (uint8)'h', (uint8)'e', (uint8)'Y', (uint8)'G' , (uint8)'a', (uint8)'b', (uint8)'e', (uint8)'!'};
 static uint16 bufferPadding = 5;
 
 void g_memory_init(bool detectMemoryErrors, uint16 inBufferPadding)
