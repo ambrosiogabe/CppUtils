@@ -4,6 +4,7 @@
 #ifndef GABE_CPP_UTILS_H
 #define GABE_CPP_UTILS_H
 #include <cstdint>
+#include <cstddef>
 
 // ----------------------------------
 // Memory Utils
@@ -36,7 +37,7 @@ void g_memory_copyMem(void* dst, void* src, size_t numBytes);
 // ----------------------------------
 // Logging Utils
 // ----------------------------------
-const enum g_logger_level
+enum g_logger_level
 {
 	All = 0,
 	Log = 1,
@@ -54,11 +55,11 @@ const enum g_logger_level
 #define g_logger_error(format, ...) _g_logger_error(__FILE__, __LINE__, format, __VA_ARGS__)
 #define g_logger_assert(condition, format, ...) _g_logger_assert(__FILE__, __LINE__, condition, format, __VA_ARGS__)
 #else
-#define Log(format, ZeroOrMoreArgs...) _Log(__FILE__, __LINE__, format, ZeroOrMoreArgs)
-#define Info(format, ZeroOrMoreArgs...) _Info(__FILE__, __LINE__, format, ZeroOrMoreArgs)
-#define Warning(format, ZeroOrMoreArgs...) _Warning(__FILE__, __LINE__, format, ZeroOrMoreArgs)
-#define Error(format, ZeroOrMoreArgs...) _Error(__FILE__, __LINE__, format, ZeroOrMoreArgs)
-#define Assert(condition, format, ...) _Assert(__FILE__, __LINE__, condition, format, ZeroOrMoreArgs)
+#define g_logger_log(format, ...) _g_logger_log(__FILE__, __LINE__, format,##__VA_ARGS__)
+#define g_logger_info(format, ...) _g_logger_info(__FILE__, __LINE__, format,##__VA_ARGS__)
+#define g_logger_warning(format, ...) _g_logger_warning(__FILE__, __LINE__, format,##__VA_ARGS__)
+#define g_logger_error(format, ...) _g_logger_error(__FILE__, __LINE__, format,##__VA_ARGS__)
+#define g_logger_assert(condition, format, ...) _g_logger_assert(__FILE__, __LINE__, condition, format,##__VA_ARGS__)
 #endif
 
 
@@ -85,12 +86,16 @@ g_logger_level g_logger_get_level();
 #include <vector>
 #include <mutex>
 #include <stdio.h>
-#include <varargs.h>
+#ifndef __linux__
+//#include <varargs.h>
+#endif
 #include <stdarg.h>
 #include <stdlib.h>
 #include <chrono>
 #include <thread>
 #include <array>
+#include <algorithm>
+#include <cstring>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -331,6 +336,18 @@ void g_memory_copyMem(void* dst, void* src, size_t numBytes)
 // ----------------------------------
 static std::mutex logMutex;
 
+static g_logger_level log_level = g_logger_level::All;
+
+void g_logger_set_level(g_logger_level level)
+{
+	log_level = level;
+}
+
+g_logger_level g_logger_get_level()
+{
+	return log_level;
+}
+
 #ifdef _WIN32
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
@@ -452,21 +469,136 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 		}
 	}
 }
-#endif // LOGGING_IMPL_WIN32
 
-static g_logger_level log_level = g_logger_level::All;
+#elif defined(__linux__) // end LOGGING_IMPL_WIN32
+// begin LOGGING_IMPL_LINUX
 
-void g_logger_set_level(g_logger_level level)
+#include <csignal>
+
+namespace ColorCode
 {
-	log_level = level;
+	const char* KNRM = "\x1B[0m";
+	const char* KRED = "\x1B[31m";
+	const char* KGRN = "\x1B[32m";
+	const char* KYEL = "\x1B[33m";
+	const char* KBLU = "\x1B[34m";
+	const char* KMAG = "\x1B[35m";
+	const char* KCYN = "\x1B[36m";
+	const char* KWHT = "\x1B[37m";
 }
 
-g_logger_level g_logger_get_level()
+void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
-	return log_level;
+	if (g_logger_get_level() <= g_logger_level::Log)
+	{
+		std::lock_guard<std::mutex> lock(logMutex);
+		printf("%s%s (line %d) Log: \n", ColorCode::KBLU, filename, line);
+
+		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		char buf[20] = { 0 };
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		printf("%s[%s]: ", ColorCode::KNRM, buf);
+
+		va_list args;
+		va_start(args, format);
+		vprintf(format, args);
+		va_end(args);
+
+		printf("\n");
+	}
 }
 
-#ifndef _WIN32
+void _g_logger_info(const char* filename, int line, const char* format, ...)
+{
+	if (g_logger_get_level() <= g_logger_level::Info)
+	{
+		std::lock_guard<std::mutex> lock(logMutex);
+		printf("%s%s (line %d) Info: \n", ColorCode::KGRN, filename, line);
+
+		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		char buf[20] = { 0 };
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		printf("%s[%s]: ", ColorCode::KNRM, buf);
+
+		va_list args;
+		va_start(args, format);
+		vprintf(format, args);
+		va_end(args);
+
+		printf("\n");
+	}
+}
+
+void _g_logger_warning(const char* filename, int line, const char* format, ...)
+{
+	if (g_logger_get_level() <= g_logger_level::Warning)
+	{
+		std::lock_guard<std::mutex> lock(logMutex);
+		printf("%s%s (line %d) Warning: \n", ColorCode::KYEL, filename, line);
+
+		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		char buf[20] = { 0 };
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		printf("%s[%s]: ", ColorCode::KNRM, buf);
+
+		va_list args;
+		va_start(args, format);
+		vprintf(format, args);
+		va_end(args);
+
+		printf("\n");
+	}
+}
+
+void _g_logger_error(const char* filename, int line, const char* format, ...)
+{
+	if (g_logger_get_level() <= g_logger_level::Error)
+	{
+		std::lock_guard<std::mutex> lock(logMutex);
+		printf("%s%s (line %d) Error: \n", ColorCode::KRED, filename, line);
+
+		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		char buf[20] = { 0 };
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		printf("%s[%s]: ", ColorCode::KNRM, buf);
+
+		va_list args;
+		va_start(args, format);
+		vprintf(format, args);
+		va_end(args);
+
+		printf("\n");
+	}
+}
+
+void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
+{
+	if (g_logger_get_level() <= g_logger_level::Assert)
+	{
+		if (!condition)
+		{
+			std::lock_guard<std::mutex> lock(logMutex);
+			printf("%s%s (line %d) Assertion Failure: \n", ColorCode::KRED, filename, line);
+
+			std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+			char buf[20] = { 0 };
+			std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+			printf("%s[%s]: ", ColorCode::KNRM, buf);
+
+			va_list args;
+			va_start(args, format);
+			vprintf(format, args);
+			va_end(args);
+
+			printf("\n");
+			std::raise(SIGINT);
+			exit(-1);
+		}
+	}
+}
+
+#else // end LOGGING_IMPL_LINUX
+// Begin DEFAULT_LOGGING_IMPL
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
@@ -578,43 +710,3 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 }
 #endif // DEFAULT_LOGGING_IMPL
 #endif // CPP_UTILS_IMPL
-
-
-// ===================================================================================
-// Test main
-// This is just a testing workspace for me while developing this
-// do not define GABE_CPP_UTILS_TEST_MAIN unless you are developing 
-// this single_include file.
-// ===================================================================================
-#ifdef GABE_CPP_UTILS_TEST_MAIN
-
-void main()
-{
-	g_logger_set_level(g_logger_level::All);
-	g_logger_info("Some information.");
-	g_logger_warning("A warning!");
-	g_logger_error("This is an error...");
-
-	g_memory_init(true, 1024);
-
-	// Untracked memory allocation, we should be warned.
-	g_memory_allocate(sizeof(char) * 1025);
-
-	void* someMemory = g_memory_allocate(sizeof(char) * 1024);
-	g_memory_free(someMemory);
-
-	uint8* memoryCorruptionBufferUnderrun = (uint8*)g_memory_allocate(sizeof(char) * 357);
-	memoryCorruptionBufferUnderrun[-506] = 'h';
-	g_memory_free(memoryCorruptionBufferUnderrun);
-
-	uint8* memoryCorruptionBufferOverrun = (uint8*)g_memory_allocate(sizeof(char) * 312);
-	memoryCorruptionBufferOverrun[312 + 809] = 'a';
-	g_memory_free(memoryCorruptionBufferOverrun);
-
-	g_memory_dumpMemoryLeaks();
-
-	g_logger_assert(true, "We shouldn't see this.");
-	g_logger_assert(false, "Bad assertion, should fail and break the program.");
-}
-
-#endif // GABE_CPP_UTILS_TEST_MAIN
