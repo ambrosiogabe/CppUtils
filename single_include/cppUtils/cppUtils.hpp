@@ -245,7 +245,7 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 	{
 		// In memory error tracking mode, I'll add sentinel values to the beginning and
 		// end of the block of memory to ensure it doesn't have any errors on free
-		numBytes += (bufferPadding * 2);
+		numBytes += (bufferPadding * 2) * sizeof(uint8);
 
 		// In debug mode we allocate 10 extra bytes, 5 before the block and 5 after. We can use these to detect
 		// Buffer overruns or underruns
@@ -299,23 +299,26 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 {
 	if (trackMemoryAllocations)
 	{
-		numBytes += bufferPadding * 2;
-		oldMemory = (void*)((uint8*)oldMemory - bufferPadding);
-		void* newMemory = std::realloc(oldMemory, numBytes);
-
 		// In memory error tracking mode, I'll add sentinel values to the beginning and
 		// end of the block of memory to ensure it doesn't have any errors on free
+		oldMemory = (void*)((uint8*)oldMemory - bufferPadding);
 		auto oldMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, oldMemory });
 		if (oldMemoryIter == allocations.end())
 		{
 			g_logger_error("Tried to reallocate a block of memory that was not allocated by this library.");
 			return nullptr;
 		}
+		void* sentinelCopy = std::malloc(sizeof(uint8) * bufferPadding);
+		std::memcpy(sentinelCopy, (void*)((uint8*)oldMemory + oldMemoryIter->memorySize - bufferPadding), sizeof(uint8) * bufferPadding);
+
+		numBytes += bufferPadding * 2 * sizeof(uint8);
+		void* newMemory = std::realloc(oldMemory, numBytes);
 		if (newMemory)
 		{
-			// Move the old sentinel values that were at the end to the end of the new memory block
-			size_t oldSize = oldMemoryIter->memorySize;
-			std::memmove((uint8*)newMemory + numBytes - bufferPadding, (void*)((uint8*)newMemory + oldSize - bufferPadding), bufferPadding * sizeof(uint8));
+			// Copy the old sentinel values that were at the end to the end of the new memory block
+			oldMemoryIter->memorySize = numBytes;
+			std::memcpy((uint8*)newMemory + numBytes - bufferPadding, sentinelCopy, bufferPadding * sizeof(uint8));
+			std::free(sentinelCopy);
 		}
 
 		std::lock_guard<std::mutex> lock(memoryMtx);
