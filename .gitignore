@@ -10,3 +10,5 @@ bin-int/**
 
 Makefile
 **.make
+
+logs/**

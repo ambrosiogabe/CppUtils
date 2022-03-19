@@ -9,7 +9,9 @@
 
 void main()
 {
+	g_logger_init();
 	g_logger_set_level(g_logger_level::All);
+	g_logger_set_log_directory("C:/dev/C++/CppUtils/logs");
 	g_logger_info("Some information.");
 	g_logger_warning("A warning!");
 	g_logger_error("This is an error...");

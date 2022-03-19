@@ -9,13 +9,13 @@
 
 
 
- LICENSE
+ -------- LICENSE --------
 
  Open Source, see end of file
 
 
 
- DOCUMENTATION
+ -------- DOCUMENTATION --------
 
  This library is a single header library, inspired by the stb libraries. It
  includes several utilities to do simple things like logging and 
@@ -24,9 +24,9 @@
 
 
 
- MEMORY TRACKER/HEAP CORRUPTION DETECTOR
+ -------- MEMORY TRACKER/HEAP CORRUPTION DETECTOR --------
 
- BASIC USAGE
+ -------- BASIC USAGE --------
 
  int main() 
  {
@@ -35,7 +35,7 @@
 	g_memory_dumpMemoryLeaks();
  }
 
- FUNCTIONS
+ -------- FUNCTIONS --------
 
  g_memory_init(bool detectMemoryLeaks, uint16 bufferPadding = 5);
   - detectMemoryLeaks   -- Set this to true to detect memory corruption/leaks. When this is set to
@@ -62,9 +62,9 @@
 
 
 
- LOGGER
+ -------- LOGGER --------
 
- BASIC USAGE
+ -------- BASIC USAGE --------
 
  All logging functions follow the format of printf, where you call a function
  like:
@@ -73,9 +73,30 @@
 
  by calling it with a string, followed by a list of formatting options.
 
- FUNCTIONS
+	g_logger_info("Some string %s", "Some Format");
 
- These are all the logging options listed from least severe, to most severe:
+ You can set the log level and a specific log directory. Make sure to free
+ the logger before the application exits. A typical use in an application may
+ look like this:
+
+ int main()
+ {
+	g_logger_init();
+	g_logger_set_level(g_logger_level::All);
+	g_logger_set_log_directory("C:\\dev\\myapp\\logs");
+
+	// Run the application and log as needed
+
+	g_logger_free();
+ }
+
+ -------- FUNCTIONS --------
+
+	g_logger_init();
+	g_logger_free();
+
+	g_logger_setLogDirectory(const char* file)
+	g_logger_set_level(g_logger_level level)
 
 	g_logger_log(const char* message, ...format)
 	g_logger_info(const char* message, ...format)
@@ -83,13 +104,32 @@
 	g_logger_error(const char* message, ...format)
 	g_logger_assert(bool condition, const char* failureMessage, ...format)
 
+ -------- FUNCTION DESCRIPTIONS --------
+
+ These are all the logging options listed from least severe, to most severe:
+
+	g_logger_log(const char* message, ...format)
+	g_logger_info(const char* message, ...format)
+	g_logger_warning(const char* message, ...format)
+	g_logger_error(const char* message, ...format)
+
+ In windows this breaks into the debugger on visual studio. In production it
+ crashes with a window printing where to find the log file (if logging to a 
+ file is enabled) and the assertion failure message.
+
+	g_logger_assert(bool condition, const char* failureMessage, ...format)
+
+ Set up logging to a file as well the standard output.
+
+	g_logger_setLogDirectory(const char* file)
+
  Use this to restrict the messages to a particular level. This will log anything
  at the preferred level or higher in severity:
 
 	g_logger_set_level(g_logger_level level)
 
 
- DLL STUFF
+ -------- DLL STUFF --------
 
  If you want to use this library as part of a DLL, I have created a macro:
 
@@ -180,6 +220,11 @@ GABE_CPP_UTILS_API void _g_logger_assert(const char* filename, int line, int con
 GABE_CPP_UTILS_API void g_logger_set_level(g_logger_level level);
 GABE_CPP_UTILS_API g_logger_level g_logger_get_level();
 
+GABE_CPP_UTILS_API void g_logger_init();
+GABE_CPP_UTILS_API void g_logger_free();
+
+GABE_CPP_UTILS_API void g_logger_set_log_directory(const char* directory);
+
 #endif // GABE_CPP_UTILS_H
 
 
@@ -200,10 +245,13 @@ GABE_CPP_UTILS_API g_logger_level g_logger_get_level();
 #include <stdarg.h>
 #include <stdlib.h>
 #include <chrono>
+#include <time.h>
 #include <thread>
 #include <array>
 #include <algorithm>
 #include <cstring>
+#include <string>
+#include <format>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -449,7 +497,12 @@ void g_memory_copyMem(void* dst, void* src, size_t numBytes)
 // ----------------------------------
 static std::mutex logMutex;
 
+// Initialize these variables just in case init isn't called for some reason
 static g_logger_level log_level = g_logger_level::All;
+
+// If this is not nullptr, logging to file is enabled
+static FILE* logFile = nullptr;
+static char* logFilePath = nullptr;
 
 void g_logger_set_level(g_logger_level level)
 {
@@ -460,6 +513,70 @@ g_logger_level g_logger_get_level()
 {
 	return log_level;
 }
+
+void g_logger_init()
+{
+	logFile = nullptr;
+	logFilePath = nullptr;
+	log_level = g_logger_level::All;
+}
+
+void g_logger_free()
+{
+	if (logFile)
+	{
+		fclose(logFile);
+		logFile = nullptr;
+	}
+
+	if (logFilePath)
+	{
+		std::free(logFilePath);
+		logFilePath = nullptr;
+	}
+}
+
+void g_logger_set_log_directory(const char* directory)
+{
+	// TODO: Better error checking
+	// Max path on windows, should be large enough for linux, if not we should error out here
+	constexpr int maxPath = 261;
+
+	char timebuf[maxPath] = { 0 };
+	std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	struct tm time;
+	localtime_s(&time, &now);
+	std::strftime(timebuf, sizeof(timebuf), "/log_%Y-%m-%d.txt", &time);
+
+	size_t filenameLength = std::strlen(timebuf);
+	size_t dirStringLength = std::strlen(directory);
+	// Minus 1 here for the null character
+	if (dirStringLength >= (maxPath - filenameLength - 1))
+	{
+		printf("Directory name to long. Max length 260 gets exceeded with log filename. Not setting log directory to: %s", directory);
+		return;
+	}
+	// +1 for null byte
+	logFilePath = (char*)std::malloc(sizeof(char) * (filenameLength + dirStringLength + 1));
+	if (!logFilePath) 
+	{
+		printf("Failed to allocate memory for the log file path. Out of memory. Returning early.");
+		return;
+	}
+
+	std::memcpy(logFilePath, directory, sizeof(char) * dirStringLength);
+	std::memcpy(logFilePath + (sizeof(char) * dirStringLength), timebuf, sizeof(char) * filenameLength);
+	logFilePath[dirStringLength + filenameLength] = '\0';
+	
+	fopen_s(&logFile, logFilePath, "wb");
+	if (!logFile) 
+	{
+		printf("Failed to open file '%s' to log to. Please make sure the log directory exists, otherwise this will fail.", directory);
+		std::free(logFilePath);
+		logFilePath = nullptr;
+	}
+}
+
 
 #ifdef _WIN32
 
@@ -474,7 +591,9 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		struct tm time;
+		localtime_s(&time, &now);
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -483,6 +602,19 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -497,7 +629,9 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		struct tm time;
+		localtime_s(&time, &now);
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -506,6 +640,19 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Info: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -520,7 +667,9 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		struct tm time;
+		localtime_s(&time, &now);
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -529,6 +678,19 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Warning: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -543,7 +705,9 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		struct tm time;
+		localtime_s(&time, &now);
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -552,6 +716,19 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Error: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -562,22 +739,61 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 		if (!condition)
 		{
 			std::lock_guard<std::mutex> lock(logMutex);
+			std::string fullErrorMessage = std::string("Critical Assertion Failure\r\n\r\n") + 
+				filename + std::string(" (line ") + std::to_string(line) + ") Assertion Failure: \r\n";
+
 			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
 			printf("%s (line %d) Assertion Failure: \n", filename, line);
 			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
 			std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 			char buf[20] = { 0 };
-			std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+			struct tm time;
+			localtime_s(&time, &now);
+			std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
 			printf("[%s]: ", buf);
+			fullErrorMessage += "[" + std::string(buf) + "]";
 
 			va_list args;
 			va_start(args, format);
 			vprintf(format, args);
 			va_end(args);
 
+			constexpr int bufferCount = 512;
+			char buffer[bufferCount];
+			va_start(args, format);
+			vsnprintf(buffer, bufferCount, format, args);
+			va_end(args);
+
+			fullErrorMessage += std::string(buffer) + std::string("\r\n");
+
 			printf("\n");
+
+			if (logFile)
+			{
+				fprintf(logFile, "%s (line %d) Assertion Failure: \n", filename, line);
+				fprintf(logFile, "[%s]: ", buf);
+
+				va_list fargs;
+				va_start(fargs, format);
+				vfprintf(logFile, format, fargs);
+				va_end(fargs);
+
+				fprintf(logFile, "\n");
+
+				fullErrorMessage += "\r\n\r\nFull log file located at " + std::string(logFilePath);
+			}
+
 			_CrtDbgBreak();
+			
+			g_logger_free();
+
+			MessageBoxA(
+				NULL,
+				fullErrorMessage.c_str(),
+				"Critical Assertion Failure",
+				MB_ICONEXCLAMATION | MB_OK
+			);
 			exit(-1);
 		}
 	}
@@ -618,6 +834,19 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -639,6 +868,19 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -660,6 +902,19 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -681,6 +936,19 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -704,7 +972,23 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 			va_end(args);
 
 			printf("\n");
+
+			if (logFile)
+			{
+				fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+				fprintf(logFile, "[%s]: ", buf);
+
+				va_list fargs;
+				va_start(fargs, format);
+				vfprintf(logFile, format, fargs);
+				va_end(fargs);
+
+				fprintf(logFile, "\n");
+			}
+
 			std::raise(SIGINT);
+			g_logger_free();
+
 			exit(-1);
 		}
 	}
@@ -731,6 +1015,19 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -752,6 +1049,19 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -773,6 +1083,19 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -794,6 +1117,19 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 		va_end(args);
 
 		printf("\n");
+
+		if (logFile)
+		{
+			fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+			fprintf(logFile, "[%s]: ", buf);
+
+			va_list fargs;
+			va_start(fargs, format);
+			vfprintf(logFile, format, fargs);
+			va_end(fargs);
+
+			fprintf(logFile, "\n");
+		}
 	}
 }
 
@@ -817,6 +1153,21 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 			va_end(args);
 
 			printf("\n");
+
+			if (logFile)
+			{
+				fprintf(logFile, "%s (line %d) Log: \n", filename, line);
+				fprintf(logFile, "[%s]: ", buf);
+
+				va_list fargs;
+				va_start(fargs, format);
+				vfprintf(logFile, format, fargs);
+				va_end(fargs);
+
+				fprintf(logFile, "\n");
+			}
+
+			g_logger_free();
 			exit(-1);
 		}
 }
