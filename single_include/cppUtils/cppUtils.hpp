@@ -546,7 +546,7 @@ void g_logger_set_log_directory(const char* directory)
 	std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	struct tm time;
 	localtime_s(&time, &now);
-	std::strftime(timebuf, sizeof(timebuf), "/log_%Y-%m-%d.txt", &time);
+	std::strftime(timebuf, sizeof(timebuf), "/log_%Y-%m-%d_%I_%M_%S.txt", &time);
 
 	size_t filenameLength = std::strlen(timebuf);
 	size_t dirStringLength = std::strlen(directory);
