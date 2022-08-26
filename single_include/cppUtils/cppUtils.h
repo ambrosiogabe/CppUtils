@@ -140,6 +140,10 @@
  file anywhere and it should just work out.
 */
 
+#ifndef USE_CPP
+#define USE_CPP defined(__cplusplus)
+#endif
+
 // ===================================================================================
 // Headers
 // ===================================================================================
@@ -151,8 +155,9 @@
 #define GABE_CPP_UTILS_API 
 #endif
 
-#include <cstdint>
-#include <cstddef>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 
 // ----------------------------------
 // Memory Utils
@@ -175,7 +180,8 @@ GABE_CPP_UTILS_API void* _g_memory_allocate(const char* filename, int line, size
 GABE_CPP_UTILS_API void* _g_memory_realloc(const char* filename, int line, void* memory, size_t newSize);
 GABE_CPP_UTILS_API void _g_memory_free(const char* filename, int line, void* memory);
 
-GABE_CPP_UTILS_API void g_memory_init(bool detectMemoryLeaks, uint16 bufferPadding = 5);
+GABE_CPP_UTILS_API void g_memory_init(bool detectMemoryLeaks);
+GABE_CPP_UTILS_API void g_memory_init(bool detectMemoryLeaks, uint16 bufferPadding);
 GABE_CPP_UTILS_API void g_memory_dumpMemoryLeaks();
 
 GABE_CPP_UTILS_API int g_memory_compareMem(void* a, void* b, size_t numBytes);
@@ -185,23 +191,24 @@ GABE_CPP_UTILS_API void g_memory_copyMem(void* dst, void* src, size_t numBytes);
 // ----------------------------------
 // Logging Utils
 // ----------------------------------
-enum g_logger_level
+typedef enum g_logger_level
 {
-	All = 0,
-	Log = 1,
-	Info = 2,
-	Warning = 3,
-	Error = 4,
-	Assert = 5,
-	None = 6,
-};
+	g_logger_level_All = 0,
+	g_logger_level_Log = 1,
+	g_logger_level_Info = 2,
+	g_logger_level_Warning = 3,
+	g_logger_level_Error = 4,
+	g_logger_level_Assert = 5,
+	g_logger_level_None = 6,
+} g_logger_level;
 
 #if !(defined(__GNUC__) || defined(__GNUG__))
-#define g_logger_log(format, ...) _g_logger_log(__FILE__, __LINE__, format, __VA_ARGS__)
-#define g_logger_info(format, ...) _g_logger_info(__FILE__, __LINE__, format, __VA_ARGS__)
-#define g_logger_warning(format, ...) _g_logger_warning(__FILE__, __LINE__, format, __VA_ARGS__)
-#define g_logger_error(format, ...) _g_logger_error(__FILE__, __LINE__, format, __VA_ARGS__)
-#define g_logger_assert(condition, format, ...) _g_logger_assert(__FILE__, __LINE__, condition, format, __VA_ARGS__)
+#define VA_ARGS(...) , ##__VA_ARGS__
+#define g_logger_log(format, ...) _g_logger_log(__FILE__, __LINE__, format VA_ARGS(__VA_ARGS__))
+#define g_logger_info(format, ...) _g_logger_info(__FILE__, __LINE__, format VA_ARGS(__VA_ARGS__))
+#define g_logger_warning(format, ...) _g_logger_warning(__FILE__, __LINE__, format VA_ARGS(__VA_ARGS__))
+#define g_logger_error(format, ...) _g_logger_error(__FILE__, __LINE__, format VA_ARGS(__VA_ARGS__))
+#define g_logger_assert(condition, format, ...) _g_logger_assert(__FILE__, __LINE__, condition, format VA_ARGS(__VA_ARGS__))
 #else
 #define g_logger_log(format, ...) _g_logger_log(__FILE__, __LINE__, format,##__VA_ARGS__)
 #define g_logger_info(format, ...) _g_logger_info(__FILE__, __LINE__, format,##__VA_ARGS__)
@@ -235,23 +242,26 @@ GABE_CPP_UTILS_API void g_logger_set_log_directory(const char* directory);
 // Implementation
 // ===================================================================================
 #ifdef GABE_CPP_UTILS_IMPL
+#if USE_CPP
 #include <memory>
 #include <vector>
 #include <mutex>
-#include <stdio.h>
-#ifndef __linux__
-//#include <varargs.h>
-#endif
-#include <stdarg.h>
-#include <stdlib.h>
 #include <chrono>
-#include <time.h>
 #include <thread>
 #include <array>
 #include <algorithm>
 #include <cstring>
 #include <string>
-#include <format>
+#else 
+#include <memory.h>
+// TODO: Implement c version of mutex
+#endif
+
+// Common includes
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <time.h>
 
 #ifdef _WIN32
 #include <Windows.h>
@@ -259,8 +269,9 @@ GABE_CPP_UTILS_API void g_logger_set_log_directory(const char* directory);
 #endif
 
 // ----------------------------------
-// Memory Implementation
+// Cpp Memory Implementation
 // ----------------------------------
+#if USE_CPP
 struct DebugMemoryAllocation
 {
 	const char* fileAllocator;
@@ -353,8 +364,7 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 		auto oldMemoryIter = std::find(allocations.begin(), allocations.end(), DebugMemoryAllocation{ filename, line, 0, numBytes, oldMemory });
 		if (oldMemoryIter == allocations.end())
 		{
-			g_logger_error("Tried to reallocate a block of memory that was not allocated by this library.");
-			return nullptr;
+			return _g_memory_allocate(filename, line, numBytes);
 		}
 		void* sentinelCopy = std::malloc(sizeof(uint8) * bufferPadding);
 		std::memcpy(sentinelCopy, (void*)((uint8*)oldMemory + oldMemoryIter->memorySize - bufferPadding), sizeof(uint8) * bufferPadding);
@@ -490,11 +500,359 @@ void g_memory_copyMem(void* dst, void* src, size_t numBytes)
 {
 	std::memcpy(dst, src, numBytes);
 }
+#else // End CppWin32 Implementation
+// ----------------------------------
+// C Memory Implementation
+// ----------------------------------
+typedef struct gma_DebugMemoryAllocation
+{
+	const char* fileAllocator;
+	int fileAllocatorLine;
+	int references;
+	size_t memorySize;
+	void* memory;
+} gma_DebugMemoryAllocation;
+
+typedef struct gma_DebugMemoryAllocationList
+{
+	gma_DebugMemoryAllocation* data;
+	size_t length;
+	size_t maxCapacity;
+} gma_DebugMemoryAllocationList;
+
+static bool gma_DebugMemoryAllocation_equals(const gma_DebugMemoryAllocation* a, const gma_DebugMemoryAllocation* b)
+{
+	return a->memory == b->memory;
+}
+
+static gma_DebugMemoryAllocation* gma_DebugMemoryAllocation_find(gma_DebugMemoryAllocationList* list, const gma_DebugMemoryAllocation* value)
+{
+	for (size_t i = 0; i < list->length; i++)
+	{
+		if (gma_DebugMemoryAllocation_equals(list->data + i, value)) {
+			return list->data + i;
+		}
+	}
+
+	return NULL;
+}
+
+static void gma_DebugMemoryAllocation_push(gma_DebugMemoryAllocationList* list, const gma_DebugMemoryAllocation* element)
+{
+	// TODO: Do heavy testing here to make sure this is rock-solid
+	if (list->length + 1 > list->maxCapacity)
+	{
+		// Grow our list
+		list->maxCapacity *= 2;
+		list->data = (gma_DebugMemoryAllocation*)realloc(list->data, sizeof(gma_DebugMemoryAllocation) * list->maxCapacity);
+		if (list->data == NULL) {
+			// TODO: Error reporting
+			// TODO: Out of memory error
+		}
+	}
+
+	list->data[list->length] = *element;
+	list->length += 1;
+}
+
+static void gma_DebugMemoryAllocation_erase(gma_DebugMemoryAllocationList* list, const gma_DebugMemoryAllocation* element)
+{
+	for (size_t i = 0; i < list->length; i++)
+	{
+		if (gma_DebugMemoryAllocation_equals(list->data + i, element)) {
+			// Erase the element here
+			memmove_s(
+				list->data + i,
+				sizeof(gma_DebugMemoryAllocation) * (list->length - 1),
+				list->data + i + 1,
+				sizeof(gma_DebugMemoryAllocation) * (list->length - 1)
+			);
+			list->length -= 1;
+			return;
+		}
+	}
+}
+
+static void gma_DebugMemoryAllocationList_init(gma_DebugMemoryAllocationList* list)
+{
+	list->length = 0;
+	list->maxCapacity = 8;
+	list->data = (gma_DebugMemoryAllocation*)malloc(sizeof(gma_DebugMemoryAllocation) * list->maxCapacity);
+}
+
+// TODO: Implement thread safety
+// static std::mutex memoryMtx;
+static gma_DebugMemoryAllocationList allocations;
+static bool trackMemoryAllocations = false;
+#define specialMemoryFlagsSize 8
+static const uint8 specialMemoryFlags[specialMemoryFlagsSize] = {(uint8)'h', (uint8)'e', (uint8)'Y', (uint8)'G' , (uint8)'a', (uint8)'b', (uint8)'e', (uint8)'!'};
+static uint16 bufferPadding = 5;
+
+void g_memory_init(bool detectMemoryErrors, uint16 inBufferPadding)
+{
+	trackMemoryAllocations = detectMemoryErrors;
+	bufferPadding = inBufferPadding;
+	gma_DebugMemoryAllocationList_init(&allocations);
+}
+
+void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
+{
+	if (trackMemoryAllocations)
+	{
+		// In memory error tracking mode, I'll add sentinel values to the beginning and
+		// end of the block of memory to ensure it doesn't have any errors on free
+		numBytes += (bufferPadding * 2) * sizeof(uint8);
+
+		// In debug mode we allocate 10 extra bytes, 5 before the block and 5 after. We can use these to detect
+		// Buffer overruns or underruns
+		// TODO: Might be cool to inject malloc like vulkan to allow custom allocators
+		void* memory = malloc(numBytes);
+		if (memory)
+		{
+			uint8* memoryBytes = (uint8*)memory;
+			for (int i = 0; i < bufferPadding; i++)
+			{
+				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
+			}
+
+			memoryBytes = ((uint8*)memory) + numBytes - bufferPadding;
+			for (int i = 0; i < bufferPadding; i++)
+			{
+				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
+			}
+		}
+
+		// TODO: Implement thread safety for C
+		// std::lock_guard<std::mutex> lock(memoryMtx);
+		// If we are in a debug build, track all memory allocations to see if we free them all as well
+		gma_DebugMemoryAllocation tmp = {
+			filename,
+			line,
+			1,
+			numBytes,
+			memory
+		};
+		gma_DebugMemoryAllocation* iterator = gma_DebugMemoryAllocation_find(&allocations, &tmp);
+		if (iterator == NULL)
+		{
+			gma_DebugMemoryAllocation_push(&allocations, &tmp);
+		}
+		else
+		{
+			if (iterator->references <= 0)
+			{
+				iterator->references++;
+				iterator->fileAllocator = filename;
+				iterator->memorySize = numBytes;
+				iterator->fileAllocatorLine = line;
+				iterator->memory = memory;
+			}
+			else
+			{
+				g_logger_error("Tried to allocate memory that has already been allocated... This should never be hit. If it is, we have a problem.");
+			}
+		}
+
+		return (void*)((uint8*)memory + bufferPadding);
+	}
+
+	// If we aren't tracking memory, just return malloc
+	return malloc(numBytes);
+}
+
+void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t numBytes)
+{
+	if (trackMemoryAllocations)
+	{
+		// In memory error tracking mode, I'll add sentinel values to the beginning and
+		// end of the block of memory to ensure it doesn't have any errors on free
+		oldMemory = (void*)((uint8*)oldMemory - bufferPadding);
+		gma_DebugMemoryAllocation tmp = { 
+			.fileAllocator = filename, 
+			.fileAllocatorLine = line, 
+		 	.references = 0, 
+			.memorySize = numBytes, 
+			.memory = oldMemory 
+		};
+		gma_DebugMemoryAllocation* oldMemoryIter = 
+			gma_DebugMemoryAllocation_find(&allocations, &tmp);
+		if (oldMemoryIter == NULL)
+		{
+			return _g_memory_allocate(filename, line, numBytes);
+		}
+		void* sentinelCopy = malloc(sizeof(uint8) * bufferPadding);
+		memcpy_s(
+			sentinelCopy,
+			sizeof(uint8) * bufferPadding,
+			(void*)((uint8*)oldMemory + oldMemoryIter->memorySize - bufferPadding),
+			sizeof(uint8) * bufferPadding
+		);
+
+		numBytes += bufferPadding * 2 * sizeof(uint8);
+		void* newMemory = realloc(oldMemory, numBytes);
+		if (newMemory)
+		{
+			// Copy the old sentinel values that were at the end to the end of the new memory block
+			oldMemoryIter->memorySize = numBytes;
+			// TODO: Use memcpy_s
+			memcpy((uint8*)newMemory + numBytes - bufferPadding, sentinelCopy, bufferPadding * sizeof(uint8));
+			free(sentinelCopy);
+		}
+
+		// TODO: Add multithreading safety in C
+		// std::lock_guard<std::mutex> lock(memoryMtx);
+		// If we are in a debug build, track all memory allocations to see if we free them all as well
+		gma_DebugMemoryAllocation newTmp = {
+			.fileAllocator = filename,
+			.fileAllocatorLine = line,
+			.references = 0,
+			.memorySize = numBytes,
+			.memory = oldMemory
+		};
+		gma_DebugMemoryAllocation* newMemoryIter = gma_DebugMemoryAllocation_find(&allocations, &newTmp);
+		if (newMemoryIter != oldMemoryIter)
+		{
+			// Realloc could not expand the current pointer, so it allocated a new memory block
+			if (oldMemoryIter == NULL)
+			{
+				g_logger_error("Tried to realloc invalid memory in '%s' line: %d.", filename, line);
+			}
+			else
+			{
+				oldMemoryIter->references--;
+			}
+
+			if (newMemoryIter == NULL)
+			{
+				gma_DebugMemoryAllocation newAlloc = {
+					.fileAllocator = filename,
+					.fileAllocatorLine = line,
+					.references = 1,
+					.memorySize = numBytes,
+					.memory = newMemory
+				};
+				gma_DebugMemoryAllocation_push(&allocations, &newAlloc);
+			}
+			else
+			{
+				if (newMemoryIter->references <= 0)
+				{
+					newMemoryIter->references++;
+					newMemoryIter->fileAllocator = filename;
+					newMemoryIter->memorySize = numBytes;
+					newMemoryIter->fileAllocatorLine = line;
+					newMemoryIter->memory = newMemory;
+				}
+				else
+				{
+					g_logger_error("Tried to allocate memory that has already been allocated... This should never be hit. If it is, we have a problem.");
+				}
+			}
+		}
+		// If realloc expanded the memory in-place, then we don't need to do anything because no "new" memory locations were allocated
+		return (void*)((uint8*)newMemory + bufferPadding);
+	}
+
+	// If we're not tracking allocations, just return realloc
+	return realloc(oldMemory, numBytes);;
+}
+
+void _g_memory_free(const char* filename, int line, void* memory)
+{
+	if (trackMemoryAllocations)
+	{
+		memory = (void*)((uint8*)memory - bufferPadding);
+		// TODO: Add multithreading safety in C
+		// std::lock_guard<std::mutex> lock(memoryMtx);
+		gma_DebugMemoryAllocation tmp = { 
+			.fileAllocator = filename, 
+			.fileAllocatorLine = line, 
+			.references = 0, 
+			.memorySize = 0, 
+			.memory = memory 
+		};
+		gma_DebugMemoryAllocation* iterator = gma_DebugMemoryAllocation_find(&allocations, &tmp);
+		if (iterator == NULL)
+		{
+			g_logger_error("Tried to free invalid memory that was never allocated at '%s' line: %d", filename, line);
+		}
+		else if (iterator->references <= 0)
+		{
+			g_logger_error("Tried to free memory that has already been freed.");
+			g_logger_error("Code that attempted to free: '%s' line: %d", filename, line);
+			g_logger_error("Code that allocated the memory block: '%s' line: %d", iterator->fileAllocator, iterator->fileAllocatorLine);
+		}
+		else
+		{
+			iterator->references--;
+
+			if (iterator->references == 0)
+			{
+				// Check to see if our special flags were changed. If they were, we have heap corruption!
+				uint8* memoryBytes = (uint8*)memory;
+				for (int i = 0; i < bufferPadding; i++)
+				{
+					if (memoryBytes[i] != specialMemoryFlags[i % specialMemoryFlagsSize])
+					{
+						g_logger_warning("Heap corruption detected. Buffer underrun in memory allocated from: '%s' line: %d", iterator->fileAllocator, iterator->fileAllocatorLine);
+						break;
+					}
+				}
+
+				memoryBytes = (uint8*)memory + iterator->memorySize - bufferPadding;
+				for (int i = 0; i < bufferPadding; i++)
+				{
+					if (memoryBytes[i] != specialMemoryFlags[i % specialMemoryFlagsSize])
+					{
+						g_logger_warning("Heap corruption detected. Buffer overrun in memory allocated from: '%s' line: %d", iterator->fileAllocator, iterator->fileAllocatorLine);
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	// When debug is turned off we literally just free the memory, so it will throw a segfault if a
+	// faulty release build was published
+	free(memory);
+}
+
+void g_memory_dumpMemoryLeaks()
+{
+	// TODO: Add multithreading safety to c impl
+	// std::lock_guard<std::mutex> lock(memoryMtx);
+	for (size_t i = 0; i < allocations.length; i++)
+	{
+		gma_DebugMemoryAllocation* alloc = allocations.data + i;
+		if (alloc->references > 0)
+		{
+			g_logger_warning("Memory leak detected. Leaked '%zu' bytes allocated from: '%s' line: %d", alloc->memorySize - (bufferPadding * 2), alloc->fileAllocator, alloc->fileAllocatorLine);
+		}
+	}
+}
+
+int g_memory_compareMem(void* a, void* b, size_t numBytes)
+{
+	return memcmp(a, b, numBytes);
+}
+
+void g_memory_zeroMem(void* memory, size_t numBytes)
+{
+	memset(memory, 0, numBytes);
+}
+
+void g_memory_copyMem(void* dst, void* src, size_t numBytes)
+{
+	memcpy(dst, src, numBytes);
+}
+
+#endif // End C11 Implementation
 
 
 // ----------------------------------
-// Logging Implementation
+// Logging Implementation Common C++
 // ----------------------------------
+#if USE_CPP
 static std::mutex logMutex;
 
 // Initialize these variables just in case init isn't called for some reason
@@ -576,24 +934,121 @@ void g_logger_set_log_directory(const char* directory)
 		logFilePath = nullptr;
 	}
 }
+#else // End Common Logging Impl C++
+// ----------------------------------
+// Logging Implementation Common C11
+// ----------------------------------
+
+// TODO: Add multithreading safety to c impl
+// static std::mutex logMutex;
+
+// Initialize these variables just in case init isn't called for some reason
+static g_logger_level log_level = g_logger_level_All;
+
+// If this is not nullptr, logging to file is enabled
+static FILE* logFile = NULL;
+static char* logFilePath = NULL;
+
+void g_logger_set_level(g_logger_level level)
+{
+	log_level = level;
+}
+
+g_logger_level g_logger_get_level()
+{
+	return log_level;
+}
+
+void g_logger_init()
+{
+	logFile = NULL;
+	logFilePath = NULL;
+	log_level = g_logger_level_All;
+}
+
+void g_logger_free()
+{
+	if (logFile)
+	{
+		fclose(logFile);
+		logFile = NULL;
+	}
+
+	if (logFilePath)
+	{
+		free(logFilePath);
+		logFilePath = NULL;
+	}
+}
+
+void g_logger_set_log_directory(const char* directory)
+{
+	// TODO: Better error checking
+	// Max path on windows, should be large enough for linux, if not we should error out here
+#define maxPath 261
+	char timebuf[maxPath] = { 0 };
+
+	time_t now;
+	time(&now);
+	struct tm localTime;
+	localtime_s(&localTime, &now);
+	strftime(timebuf, sizeof(timebuf), "/log_%Y-%m-%d_%I_%M_%S.txt", &localTime);
+
+	size_t filenameLength = strlen(timebuf);
+	size_t dirStringLength = strlen(directory);
+	// Minus 1 here for the null character
+	if (dirStringLength >= (maxPath - filenameLength - 1))
+	{
+		printf("Directory name to long. Max length 260 gets exceeded with log filename. Not setting log directory to: %s\n", directory);
+		return;
+	}
+	// +1 for null byte
+	logFilePath = (char*)malloc(sizeof(char) * (filenameLength + dirStringLength + 1));
+	if (!logFilePath)
+	{
+		printf("Failed to allocate memory for the log file path. Out of memory. Returning early.");
+		return;
+	}
+
+	memcpy(logFilePath, directory, sizeof(char) * dirStringLength);
+	memcpy(logFilePath + (sizeof(char) * dirStringLength), timebuf, sizeof(char) * filenameLength);
+	logFilePath[dirStringLength + filenameLength] = '\0';
+
+	fopen_s(&logFile, logFilePath, "wb");
+	if (!logFile)
+	{
+		printf("Failed to open file '%s' to log to. Please make sure the log directory exists, otherwise this will fail.", directory);
+		free(logFilePath);
+		logFilePath = NULL;
+	}
+
+#undef maxPath
+}
+#endif // End Common Logging Impl C11
 
 
+// ----------------------------------------
+// Logging Implementation OS specific C++
+// ----------------------------------------
 #ifdef _WIN32
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Log)
+	if (g_logger_get_level() <= g_logger_level_Log)
 	{
-		std::lock_guard<std::mutex> lock(logMutex);
+		// TODO: Add c multithreading safety
+		//std::lock_guard<std::mutex> lock(logMutex);
+
 		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_BLUE | FOREGROUND_GREEN);
 		printf("%s (line %d) Log: \n", filename, line);
 		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		time_t now;
+		time(&now);
 		char buf[20] = { 0 };
-		struct tm time;
-		localtime_s(&time, &now);
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
+		struct tm localTime;
+		localtime_s(&localTime, &now);
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &localTime);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -620,18 +1075,21 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 void _g_logger_info(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Info)
+	if (g_logger_get_level() <= g_logger_level_Info)
 	{
-		std::lock_guard<std::mutex> lock(logMutex);
+		// TODO: Add c multithreading safety
+		//std::lock_guard<std::mutex> lock(logMutex);
+
 		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN);
 		printf("%s (line %d) Info: \n", filename, line);
 		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		time_t now;
+		time(&now);
 		char buf[20] = { 0 };
-		struct tm time;
-		localtime_s(&time, &now);
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
+		struct tm localTime;
+		localtime_s(&localTime, &now);
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &localTime);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -658,18 +1116,21 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 void _g_logger_warning(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Warning)
+	if (g_logger_get_level() <= g_logger_level_Warning)
 	{
-		std::lock_guard<std::mutex> lock(logMutex);
+		// TODO: Multithreading safety c impl
+		// std::lock_guard<std::mutex> lock(logMutex);
+
 		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_GREEN | FOREGROUND_RED);
 		printf("%s (line %d) Warning: \n", filename, line);
 		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		time_t now;
+		time(&now);
 		char buf[20] = { 0 };
-		struct tm time;
-		localtime_s(&time, &now);
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
+		struct tm localTime;
+		localtime_s(&localTime, &now);
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &localTime);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -696,18 +1157,21 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 void _g_logger_error(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Error)
+	if (g_logger_get_level() <= g_logger_level_Error)
 	{
-		std::lock_guard<std::mutex> lock(logMutex);
+		// TODO: Multithreading c impl
+		// std::lock_guard<std::mutex> lock(logMutex);
+
 		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
 		printf("%s (line %d) Error: \n", filename, line);
 		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		time_t now;
+		time(&now);
 		char buf[20] = { 0 };
-		struct tm time;
-		localtime_s(&time, &now);
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
+		struct tm localTime;
+		localtime_s(&localTime, &now);
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &localTime);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -734,39 +1198,62 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Assert)
+	if (g_logger_get_level() <= g_logger_level_Assert)
 	{
 		if (!condition)
 		{
-			std::lock_guard<std::mutex> lock(logMutex);
-			std::string fullErrorMessage = std::string("Critical Assertion Failure\r\n\r\n") + 
-				filename + std::string(" (line ") + std::to_string(line) + ") Assertion Failure: \r\n";
+			// TODO: Multithreading c impl
+			// std::lock_guard<std::mutex> lock(logMutex);
+
+#define fullErrorMessageBufferSize 4096
+			char fullErrorMessageBuffer[fullErrorMessageBufferSize];
+
+			size_t offset = 0;
+			sprintf_s(
+				fullErrorMessageBuffer, 
+				fullErrorMessageBufferSize, 
+				"Critical Assertion Failure\r\n\r\n%s (line) Assertion Failure: \r\n",
+				filename, line
+			);
+			offset = strlen(fullErrorMessageBuffer);
 
 			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
 			printf("%s (line %d) Assertion Failure: \n", filename, line);
 			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
-			std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+			time_t now;
+			time(&now);
 			char buf[20] = { 0 };
-			struct tm time;
-			localtime_s(&time, &now);
-			std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &time);
+			struct tm localTime;
+			localtime_s(&localTime, &now);
+			strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &localTime);
 			printf("[%s]: ", buf);
-			fullErrorMessage += "[" + std::string(buf) + "]";
+			sprintf_s(
+				fullErrorMessageBuffer + offset,
+				fullErrorMessageBufferSize - offset,
+				"[%s]",
+				buf
+			);
+			offset = strlen(fullErrorMessageBuffer);
 
 			va_list args;
 			va_start(args, format);
 			vprintf(format, args);
 			va_end(args);
 
-			constexpr int bufferCount = 512;
+#define bufferCount 512
 			char buffer[bufferCount];
 			va_start(args, format);
 			vsnprintf(buffer, bufferCount, format, args);
 			va_end(args);
 
-			fullErrorMessage += std::string(buffer) + std::string("\r\n");
-
+			sprintf_s(
+				fullErrorMessageBuffer + offset,
+				fullErrorMessageBufferSize - offset,
+				"%s\r\n",
+				buffer
+			);
+			offset = strlen(fullErrorMessageBuffer);
 			printf("\n");
 
 			if (logFile)
@@ -781,7 +1268,12 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 
 				fprintf(logFile, "\n");
 
-				fullErrorMessage += "\r\n\r\nFull log file located at " + std::string(logFilePath);
+				sprintf_s(
+					fullErrorMessageBuffer + offset,
+					fullErrorMessageBufferSize - offset,
+					"\r\n\r\nFull log file located at %s",
+					logFilePath
+				);
 			}
 
 			_CrtDbgBreak();
@@ -790,13 +1282,16 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 
 			MessageBoxA(
 				NULL,
-				fullErrorMessage.c_str(),
+				fullErrorMessageBuffer,
 				"Critical Assertion Failure",
 				MB_ICONEXCLAMATION | MB_OK
 			);
 			exit(-1);
 		}
 	}
+
+#undef bufferCount
+#undef fullErrorMessageBufferSize
 }
 
 #elif defined(__linux__) // end LOGGING_IMPL_WIN32

@@ -5,12 +5,12 @@
 // this single_include file.
 // ===================================================================================
 #ifdef GABE_CPP_UTILS_TEST_MAIN
-#include <cppUtils/cppUtils.hpp>
+#include <cppUtils/cppUtils.h>
 
 void main()
 {
 	g_logger_init();
-	g_logger_set_level(g_logger_level::All);
+	g_logger_set_level(g_logger_level_All);
 	g_logger_set_log_directory("C:/dev/C++/CppUtils/logs");
 	g_logger_info("Some information.");
 	g_logger_warning("A warning!");

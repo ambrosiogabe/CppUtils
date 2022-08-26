@@ -12,8 +12,8 @@ outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 project "CppUtils"
     kind "ConsoleApp"
-    language "C++"
-    cppdialect "C++17"
+    language "C"
+    cdialect "C11"
     staticruntime "on"
 
 	targetdir ("bin/" .. outputdir .. "/%{prj.name}")
@@ -22,9 +22,13 @@ project "CppUtils"
     outputPath = "bin/" .. outputdir .. "/%{prj.name}/"
     debugdir(outputPath)
 
+    buildoptions { 
+        "-std=c11" 
+    }
+    
 	files {
-        "single_include/cppUtils/cppUtils.hpp",
-        "single_include/cppUtils/**.cpp"
+        "single_include/cppUtils/cppUtils.h",
+        "single_include/cppUtils/**.c"
     }
 
     includedirs {
