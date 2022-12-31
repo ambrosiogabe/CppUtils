@@ -82,7 +82,7 @@
  int main()
  {
 	g_logger_init();
-	g_logger_set_level(g_logger_level::All);
+	g_logger_set_level(g_logger_level_All);
 	g_logger_set_log_directory("C:\\dev\\myapp\\logs");
 
 	// Run the application and log as needed
@@ -856,7 +856,7 @@ void g_memory_copyMem(void* dst, void* src, size_t numBytes)
 static std::mutex logMutex;
 
 // Initialize these variables just in case init isn't called for some reason
-static g_logger_level log_level = g_logger_level::All;
+static g_logger_level log_level = g_logger_level_All;
 
 // If this is not nullptr, logging to file is enabled
 static FILE* logFile = nullptr;
@@ -876,7 +876,7 @@ void g_logger_init()
 {
 	logFile = nullptr;
 	logFilePath = nullptr;
-	log_level = g_logger_level::All;
+	log_level = g_logger_level_All;
 }
 
 void g_logger_free()
@@ -1321,7 +1321,7 @@ namespace ColorCode
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Log)
+	if (g_logger_get_level() <= g_logger_level_Log)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s%s (line %d) Log: \n", ColorCode::KBLU, filename, line);
@@ -1355,7 +1355,7 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 void _g_logger_info(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Info)
+	if (g_logger_get_level() <= g_logger_level_Info)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s%s (line %d) Info: \n", ColorCode::KGRN, filename, line);
@@ -1389,7 +1389,7 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 void _g_logger_warning(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Warning)
+	if (g_logger_get_level() <= g_logger_level_Warning)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s%s (line %d) Warning: \n", ColorCode::KYEL, filename, line);
@@ -1423,7 +1423,7 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 void _g_logger_error(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Error)
+	if (g_logger_get_level() <= g_logger_level_Error)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s%s (line %d) Error: \n", ColorCode::KRED, filename, line);
@@ -1457,7 +1457,7 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Assert)
+	if (g_logger_get_level() <= g_logger_level_Assert)
 	{
 		if (!condition)
 		{
@@ -1502,7 +1502,7 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Log)
+	if (g_logger_get_level() <= g_logger_level_Log)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s (line %d) Log: \n", filename, line);
@@ -1536,7 +1536,7 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 void _g_logger_info(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Info)
+	if (g_logger_get_level() <= g_logger_level_Info)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s (line %d) Info: \n", filename, line);
@@ -1570,7 +1570,7 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 void _g_logger_warning(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Warning)
+	if (g_logger_get_level() <= g_logger_level_Warning)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s (line %d) Warning: \n", filename, line);
@@ -1604,7 +1604,7 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 void _g_logger_error(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Error)
+	if (g_logger_get_level() <= g_logger_level_Error)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s (line %d) Error: \n", filename, line);
@@ -1638,7 +1638,7 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Assert)
+	if (g_logger_get_level() <= g_logger_level_Assert)
 	{
 		if (!condition)
 		{
