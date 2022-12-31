@@ -903,7 +903,11 @@ void g_logger_set_log_directory(const char* directory)
 	char timebuf[maxPath] = { 0 };
 	std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	struct tm time;
+#ifdef localtime_s
 	localtime_s(&time, &now);
+#else
+	localtime_r(&now, &time);
+#endif
 	std::strftime(timebuf, sizeof(timebuf), "/log_%Y-%m-%d_%I_%M_%S.txt", &time);
 
 	size_t filenameLength = std::strlen(timebuf);
@@ -926,7 +930,11 @@ void g_logger_set_log_directory(const char* directory)
 	std::memcpy(logFilePath + (sizeof(char) * dirStringLength), timebuf, sizeof(char) * filenameLength);
 	logFilePath[dirStringLength + filenameLength] = '\0';
 	
+#ifdef fopen_s
 	fopen_s(&logFile, logFilePath, "wb");
+#else
+	logFile = fopen(logFilePath, "wb");
+#endif
 	if (!logFile) 
 	{
 		printf("Failed to open file '%s' to log to. Please make sure the log directory exists, otherwise this will fail.", directory);
