@@ -82,7 +82,7 @@
  int main()
  {
 	g_logger_init();
-	g_logger_set_level(g_logger_level::All);
+	g_logger_set_level(g_logger_level_All);
 	g_logger_set_log_directory("C:\\dev\\myapp\\logs");
 
 	// Run the application and log as needed
@@ -856,7 +856,7 @@ void g_memory_copyMem(void* dst, void* src, size_t numBytes)
 static std::mutex logMutex;
 
 // Initialize these variables just in case init isn't called for some reason
-static g_logger_level log_level = g_logger_level::All;
+static g_logger_level log_level = g_logger_level_All;
 
 // If this is not nullptr, logging to file is enabled
 static FILE* logFile = nullptr;
@@ -876,7 +876,7 @@ void g_logger_init()
 {
 	logFile = nullptr;
 	logFilePath = nullptr;
-	log_level = g_logger_level::All;
+	log_level = g_logger_level_All;
 }
 
 void g_logger_free()
@@ -903,7 +903,11 @@ void g_logger_set_log_directory(const char* directory)
 	char timebuf[maxPath] = { 0 };
 	std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	struct tm time;
+#ifdef localtime_s
 	localtime_s(&time, &now);
+#else
+	localtime_r(&now, &time);
+#endif
 	std::strftime(timebuf, sizeof(timebuf), "/log_%Y-%m-%d_%I_%M_%S.txt", &time);
 
 	size_t filenameLength = std::strlen(timebuf);
@@ -926,7 +930,11 @@ void g_logger_set_log_directory(const char* directory)
 	std::memcpy(logFilePath + (sizeof(char) * dirStringLength), timebuf, sizeof(char) * filenameLength);
 	logFilePath[dirStringLength + filenameLength] = '\0';
 	
+#ifdef fopen_s
 	fopen_s(&logFile, logFilePath, "wb");
+#else
+	logFile = fopen(logFilePath, "wb");
+#endif
 	if (!logFile) 
 	{
 		printf("Failed to open file '%s' to log to. Please make sure the log directory exists, otherwise this will fail.", directory);
@@ -1313,7 +1321,7 @@ namespace ColorCode
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Log)
+	if (g_logger_get_level() <= g_logger_level_Log)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s%s (line %d) Log: \n", ColorCode::KBLU, filename, line);
@@ -1347,7 +1355,7 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 void _g_logger_info(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Info)
+	if (g_logger_get_level() <= g_logger_level_Info)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s%s (line %d) Info: \n", ColorCode::KGRN, filename, line);
@@ -1381,7 +1389,7 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 void _g_logger_warning(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Warning)
+	if (g_logger_get_level() <= g_logger_level_Warning)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s%s (line %d) Warning: \n", ColorCode::KYEL, filename, line);
@@ -1415,7 +1423,7 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 void _g_logger_error(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Error)
+	if (g_logger_get_level() <= g_logger_level_Error)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s%s (line %d) Error: \n", ColorCode::KRED, filename, line);
@@ -1449,7 +1457,7 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Assert)
+	if (g_logger_get_level() <= g_logger_level_Assert)
 	{
 		if (!condition)
 		{
@@ -1494,7 +1502,7 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Log)
+	if (g_logger_get_level() <= g_logger_level_Log)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s (line %d) Log: \n", filename, line);
@@ -1528,7 +1536,7 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 void _g_logger_info(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Info)
+	if (g_logger_get_level() <= g_logger_level_Info)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s (line %d) Info: \n", filename, line);
@@ -1562,7 +1570,7 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 void _g_logger_warning(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Warning)
+	if (g_logger_get_level() <= g_logger_level_Warning)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s (line %d) Warning: \n", filename, line);
@@ -1596,7 +1604,7 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 void _g_logger_error(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Error)
+	if (g_logger_get_level() <= g_logger_level_Error)
 	{
 		std::lock_guard<std::mutex> lock(logMutex);
 		printf("%s (line %d) Error: \n", filename, line);
@@ -1630,7 +1638,7 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Assert)
+	if (g_logger_get_level() <= g_logger_level_Assert)
 	{
 		if (!condition)
 		{
