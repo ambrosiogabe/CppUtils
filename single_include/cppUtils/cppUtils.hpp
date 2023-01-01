@@ -266,10 +266,14 @@ GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx);
 #include <time.h>
 
 #ifdef _WIN32
+// Ignore Win32 warnings
+#pragma warning( push )
+#pragma warning( disable : 5105)
 #include <Windows.h>
 #include <crtdbg.h>
 // For mutex on Windows
 #include <synchapi.h>
+#pragma warning( pop )
 #endif
 
 // Forward declarations

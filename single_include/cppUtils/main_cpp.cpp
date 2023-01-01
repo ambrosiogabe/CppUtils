@@ -23,7 +23,7 @@ void threadLogger(const char* threadName)
 // library catches it so we disable warnings about unreferenced vars
 #pragma warning( push )
 #pragma warning( disable : 4189)
-void main()
+int main()
 {
 	g_logger_init();
 	g_logger_set_level(g_logger_level_All);
@@ -77,6 +77,8 @@ void main()
 
 	g_memory_deinit();
 	g_logger_free();
+
+	return 0;
 }
 #pragma warning( pop ) 
 
