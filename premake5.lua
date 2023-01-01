@@ -43,6 +43,10 @@ project "CppUtilsTest_C"
 
     filter "system:Windows"
         systemversion "latest"
+        buildoptions {
+            "/W4",
+            "/WX"
+        }
 
 project "CppUtilsTest_Cpp"
     kind "ConsoleApp"
@@ -73,4 +77,8 @@ project "CppUtilsTest_Cpp"
 
 	filter "system:Windows"
         systemversion "latest"
+        buildoptions {
+            "/W4",
+            "/WX"
+        }
 

@@ -183,8 +183,8 @@ GABE_CPP_UTILS_API void _g_memory_free(const char* filename, int line, void* mem
 
 GABE_CPP_UTILS_API void g_memory_init(bool detectMemoryLeaks);
 GABE_CPP_UTILS_API void g_memory_init_padding(bool detectMemoryLeaks, uint16 bufferPadding);
-GABE_CPP_UTILS_API void g_memory_deinit();
-GABE_CPP_UTILS_API void g_memory_dumpMemoryLeaks();
+GABE_CPP_UTILS_API void g_memory_deinit(void);
+GABE_CPP_UTILS_API void g_memory_dumpMemoryLeaks(void);
 
 GABE_CPP_UTILS_API int g_memory_compareMem(void* a, void* b, size_t numBytes);
 GABE_CPP_UTILS_API void g_memory_zeroMem(void* memory, size_t numBytes);
@@ -227,10 +227,10 @@ GABE_CPP_UTILS_API void _g_logger_error(const char* filename, int line, const ch
 GABE_CPP_UTILS_API void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...);
 
 GABE_CPP_UTILS_API void g_logger_set_level(g_logger_level level);
-GABE_CPP_UTILS_API g_logger_level g_logger_get_level();
+GABE_CPP_UTILS_API g_logger_level g_logger_get_level(void);
 
-GABE_CPP_UTILS_API void g_logger_init();
-GABE_CPP_UTILS_API void g_logger_free();
+GABE_CPP_UTILS_API void g_logger_init(void);
+GABE_CPP_UTILS_API void g_logger_free(void);
 
 GABE_CPP_UTILS_API void g_logger_set_log_directory(const char* directory);
 
@@ -242,7 +242,7 @@ GABE_CPP_UTILS_API void g_logger_set_log_directory(const char* directory);
 // You should use a different library if you need interprocess
 // mutexes and not single-multithread-process mutexes
 
-GABE_CPP_UTILS_API void* g_thread_createMutex();
+GABE_CPP_UTILS_API void* g_thread_createMutex(void);
 GABE_CPP_UTILS_API void g_thread_lockMutex(void* mtx);
 GABE_CPP_UTILS_API void g_thread_releaseMutex(void* mtx);
 GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx);
@@ -273,7 +273,7 @@ GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx);
 #endif
 
 // Forward declarations
-static void* g_thread_createMutexUntracked();
+static void* g_thread_createMutexUntracked(void);
 static void g_thread_freeMutexUntracked(void* mutex);
 
 // ----------------------------------
@@ -329,26 +329,6 @@ static void gma_DebugMemoryAllocation_push(gma_DebugMemoryAllocationList* list, 
 	list->length += 1;
 }
 
-static void gma_DebugMemoryAllocation_erase(gma_DebugMemoryAllocationList* list, const gma_DebugMemoryAllocation* element)
-{
-	// TODO: Do heavy testing here to make sure this is rock-solid
-	for (size_t i = 0; i < list->length; i++)
-	{
-		if (gma_DebugMemoryAllocation_equals(list->data + i, element))
-		{
-			// Erase the element here
-			memmove_s(
-				list->data + i,
-				sizeof(gma_DebugMemoryAllocation) * (list->length - 1),
-				list->data + i + 1,
-				sizeof(gma_DebugMemoryAllocation) * (list->length - 1)
-			);
-			list->length -= 1;
-			return;
-		}
-	}
-}
-
 static void gma_DebugMemoryAllocationList_init(gma_DebugMemoryAllocationList* list)
 {
 	list->length = 0;
@@ -376,7 +356,7 @@ void g_memory_init_padding(bool detectMemoryErrors, uint16 inBufferPadding)
 	memoryMtx = g_thread_createMutexUntracked();
 }
 
-void g_memory_deinit()
+void g_memory_deinit(void)
 {
 	if (memoryMtx)
 	{
@@ -399,13 +379,13 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 		if (memory)
 		{
 			uint8* memoryBytes = (uint8*)memory;
-			for (int i = 0; i < bufferPadding; i++)
+			for (uint16 i = 0; i < bufferPadding; i++)
 			{
 				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
 			}
 
 			memoryBytes = ((uint8*)memory) + numBytes - bufferPadding;
-			for (int i = 0; i < bufferPadding; i++)
+			for (uint16 i = 0; i < bufferPadding; i++)
 			{
 				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
 			}
@@ -606,7 +586,7 @@ void _g_memory_free(const char* filename, int line, void* memory)
 	free(memory);
 }
 
-void g_memory_dumpMemoryLeaks()
+void g_memory_dumpMemoryLeaks(void)
 {
 	g_thread_lockMutex(memoryMtx);
 
@@ -655,12 +635,12 @@ void g_logger_set_level(g_logger_level level)
 	log_level = level;
 }
 
-g_logger_level g_logger_get_level()
+g_logger_level g_logger_get_level(void)
 {
 	return log_level;
 }
 
-void g_logger_init()
+void g_logger_init(void)
 {
 	logFile = NULL;
 	logFilePath = NULL;
@@ -668,7 +648,7 @@ void g_logger_init()
 	logMutex = g_thread_createMutexUntracked();
 }
 
-void g_logger_free()
+void g_logger_free(void)
 {
 	if (logFile)
 	{
@@ -922,7 +902,7 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 			sprintf_s(
 				fullErrorMessageBuffer,
 				fullErrorMessageBufferSize,
-				"Critical Assertion Failure\r\n\r\n%s (line) Assertion Failure: \r\n",
+				"Critical Assertion Failure\r\n\r\n%s (line %d) Assertion Failure: \r\n",
 				filename, line
 			);
 			offset = strlen(fullErrorMessageBuffer);
@@ -1414,7 +1394,7 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 // ----------------------------------
 #ifdef _WIN32 
 
-GABE_CPP_UTILS_API void* g_thread_createMutex()
+GABE_CPP_UTILS_API void* g_thread_createMutex(void)
 {
 	CRITICAL_SECTION* criticalSection = (CRITICAL_SECTION*)g_memory_allocate(sizeof(CRITICAL_SECTION));
 	InitializeCriticalSection(criticalSection);
@@ -1444,15 +1424,18 @@ GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx)
 	}
 }
 
-static void* g_thread_createMutexUntracked() 
+static void* g_thread_createMutexUntracked(void)
 {
 	CRITICAL_SECTION* criticalSection = (CRITICAL_SECTION*)malloc(sizeof(CRITICAL_SECTION));
-	InitializeCriticalSection(criticalSection);
+	if (criticalSection)
+	{
+		InitializeCriticalSection(criticalSection);
+	}
 
 	return (void*)criticalSection;
 }
 
-static void g_thread_freeMutexUntracked(void* mtx) 
+static void g_thread_freeMutexUntracked(void* mtx)
 {
 	if (mtx)
 	{

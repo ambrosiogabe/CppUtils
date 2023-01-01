@@ -19,6 +19,10 @@ void threadLogger(const char* threadName)
 	}
 }
 
+// I'm purposely leaking memory and don't want to be warned to see if my
+// library catches it so we disable warnings about unreferenced vars
+#pragma warning( push )
+#pragma warning( disable : 4189)
 void main()
 {
 	g_logger_init();
@@ -74,5 +78,6 @@ void main()
 	g_memory_deinit();
 	g_logger_free();
 }
+#pragma warning( pop ) 
 
 #endif // GABE_CPP_UTILS_TEST_MAIN
