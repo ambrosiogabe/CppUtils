@@ -7,15 +7,15 @@
 #ifdef GABE_CPP_UTILS_TEST_MAIN
 #include <cppUtils/cppUtils.hpp>
 
-#ifdef _CPP 
+#include <array>
 #include <thread>
-#endif
+#include <string>
 
-void threadLogger()
+void threadLogger(const char* threadName)
 {
 	for (int i = 0; i < 10; i++)
 	{
-		g_logger_info("i: %d", i);
+		g_logger_info("%s[i]: %d", threadName, i);
 	}
 }
 
@@ -30,9 +30,21 @@ void main()
 
 	g_memory_init_padding(true, 1024);
 
-#ifdef _CPP
-	g_logger_info("Using CPP");
-#endif
+	std::array<std::thread, 5> threads;
+	std::array<const char*, threads.size()> threadNames;
+	for (size_t i = 0; i < threads.size(); i++)
+	{
+		std::string str = std::string("Thread_") + std::to_string(i);
+		threadNames[i] = (char*)g_memory_allocate(sizeof(char) * (str.length() + 1));
+		g_memory_copyMem((void*)threadNames[i], (void*)str.c_str(), sizeof(char) * (str.length() + 1));
+		threads[i] = std::thread(threadLogger, threadNames[i]);
+	}
+
+	for (size_t i = 0; i < threads.size(); i++)
+	{
+		threads[i].join();
+		g_memory_free((void*)threadNames[i]);
+	}
 
 	// Untracked memory allocation, we should be warned.
 	void* leakedMemory = g_memory_allocate(sizeof(uint8) * 1025);
