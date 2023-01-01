@@ -7,18 +7,6 @@
 #ifdef GABE_CPP_UTILS_TEST_MAIN
 #include <cppUtils/cppUtils.hpp>
 
-#ifdef _CPP 
-#include <thread>
-#endif
-
-void threadLogger()
-{
-	for (int i = 0; i < 10; i++)
-	{
-		g_logger_info("i: %d", i);
-	}
-}
-
 void main()
 {
 	g_logger_init();
@@ -29,10 +17,6 @@ void main()
 	g_logger_error("This is an error...");
 
 	g_memory_init_padding(true, 1024);
-
-#ifdef _CPP
-	g_logger_info("Using CPP");
-#endif
 
 	// Untracked memory allocation, we should be warned.
 	void* leakedMemory = g_memory_allocate(sizeof(uint8) * 1025);
