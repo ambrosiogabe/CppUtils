@@ -7,11 +7,23 @@
 #ifdef GABE_CPP_UTILS_TEST_MAIN
 #include <cppUtils/cppUtils.hpp>
 
+#include <array>
+#include <thread>
+#include <string>
+
+void threadLogger(const char* threadName)
+{
+	for (int i = 0; i < 10; i++)
+	{
+		g_logger_info("%s[i]: %d", threadName, i);
+	}
+}
+
 // I'm purposely leaking memory and don't want to be warned to see if my
 // library catches it so we disable warnings about unreferenced vars
 #pragma warning( push )
 #pragma warning( disable : 4189)
-void main(void)
+void main()
 {
 	g_logger_init();
 	g_logger_set_level(g_logger_level_All);
@@ -21,6 +33,22 @@ void main(void)
 	g_logger_error("This is an error...");
 
 	g_memory_init_padding(true, 1024);
+
+	std::array<std::thread, 5> threads;
+	std::array<const char*, threads.size()> threadNames;
+	for (size_t i = 0; i < threads.size(); i++)
+	{
+		std::string str = std::string("Thread_") + std::to_string(i);
+		threadNames[i] = (char*)g_memory_allocate(sizeof(char) * (str.length() + 1));
+		g_memory_copyMem((void*)threadNames[i], (void*)str.c_str(), sizeof(char) * (str.length() + 1));
+		threads[i] = std::thread(threadLogger, threadNames[i]);
+	}
+
+	for (size_t i = 0; i < threads.size(); i++)
+	{
+		threads[i].join();
+		g_memory_free((void*)threadNames[i]);
+	}
 
 	// Untracked memory allocation, we should be warned.
 	void* leakedMemory = g_memory_allocate(sizeof(uint8) * 1025);
