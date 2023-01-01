@@ -87,7 +87,7 @@
  int main()
  {
 	g_logger_init();
-	g_logger_set_level(g_logger_level::All);
+	g_logger_set_level(g_logger_level_All);
 	g_logger_set_log_directory("C:\\dev\\myapp\\logs");
 
 	// Run the application and log as needed
@@ -1024,7 +1024,7 @@ namespace ColorCode
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Log)
+	if (g_logger_get_level() <= g_logger_level_Log)
 	{
 		g_thread_lockMutex(logMutex);
 
@@ -1061,7 +1061,7 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 void _g_logger_info(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Info)
+	if (g_logger_get_level() <= g_logger_level_Info)
 	{
 		g_thread_lockMutex(logMutex);
 
@@ -1098,7 +1098,7 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 void _g_logger_warning(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Warning)
+	if (g_logger_get_level() <= g_logger_level_Warning)
 	{
 		g_thread_lockMutex(logMutex);
 
@@ -1135,7 +1135,7 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 void _g_logger_error(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Error)
+	if (g_logger_get_level() <= g_logger_level_Error)
 	{
 		g_thread_lockMutex(logMutex);
 
@@ -1172,7 +1172,7 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Assert)
+	if (g_logger_get_level() <= g_logger_level_Assert)
 	{
 		if (!condition)
 		{
@@ -1219,7 +1219,7 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Log)
+	if (g_logger_get_level() <= g_logger_level_Log)
 	{
 		g_thread_lockMutex(logMutex);
 
@@ -1256,7 +1256,7 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 void _g_logger_info(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Info)
+	if (g_logger_get_level() <= g_logger_level_Info)
 	{
 		g_thread_lockMutex(logMutex);
 
@@ -1293,7 +1293,7 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 void _g_logger_warning(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Warning)
+	if (g_logger_get_level() <= g_logger_level_Warning)
 	{
 		g_thread_lockMutex(logMutex);
 
@@ -1330,7 +1330,7 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 void _g_logger_error(const char* filename, int line, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Error)
+	if (g_logger_get_level() <= g_logger_level_Error)
 	{
 		g_thread_lockMutex(logMutex);
 
@@ -1367,7 +1367,7 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
 {
-	if (g_logger_get_level() <= g_logger_level::Assert)
+	if (g_logger_get_level() <= g_logger_level_Assert)
 	{
 		if (!condition)
 		{
