@@ -462,32 +462,37 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 			numBytes,
 			oldMemory
 		};
-		gma_DebugMemoryAllocation* oldMemoryIter =
-			gma_DebugMemoryAllocation_find(&allocations, &tmp);
+		gma_DebugMemoryAllocation* oldMemoryIter = gma_DebugMemoryAllocation_find(&allocations, &tmp);
 		numBytes += bufferPadding * 2 * sizeof(uint8);
 		void* newMemory = realloc(oldMemory, numBytes);
 
-		// If we are in a debug build, track all memory allocations to see if we free them all as well
-		gma_DebugMemoryAllocation newTmp = {
-			filename,
-			line,
-			0,
-			numBytes,
-			oldMemory
-		};
-		gma_DebugMemoryAllocation* newMemoryIter = gma_DebugMemoryAllocation_find(&allocations, &newTmp);
-		if (newMemoryIter->memory != oldMemoryIter->memory)
+		// If the memory address is the same because realloc resized in-place 
+		// we don't need to do any book-keeping for the memory tracking
+		if (newMemory != oldMemoryIter->memory)
 		{
 			// Realloc could not expand the current pointer, so it allocated a new memory block
-			if (oldMemoryIter == NULL)
-			{
-				g_logger_error("Tried to realloc invalid memory in '%s' line: %d.", filename, line);
-			}
-			else
+			if (oldMemoryIter != NULL)
 			{
 				oldMemoryIter->references--;
+				if (oldMemoryIter->references > 0) 
+				{
+					g_logger_error("Tried to reallocate memory that has already been allocated... This should never be hit. If it is, we have a problem.");
+				}
+			}
+			else 
+			{
+				g_logger_error("This should never be hit. Realloc was called with memory that wasn't allocated by this library.");
 			}
 
+			// If we are in a debug build, track all memory allocations to see if we free them all as well
+			gma_DebugMemoryAllocation newTmp = {
+				filename,
+				line,
+				0,
+				numBytes,
+				newMemory
+			};
+			gma_DebugMemoryAllocation* newMemoryIter = gma_DebugMemoryAllocation_find(&allocations, &newTmp);
 			if (newMemoryIter == NULL)
 			{
 				gma_DebugMemoryAllocation newAlloc = {
