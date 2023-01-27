@@ -400,8 +400,8 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 		void* memory = malloc(numBytes);
 		if (memory)
 		{
-			setMemoryPaddingPre(memory);
-			setMemoryPaddingPost(memory, numBytes);
+			setMemoryPaddingPre((uint8*)memory);
+			setMemoryPaddingPost((uint8*)memory, numBytes);
 		}
 
 		g_thread_lockMutex(memoryMtx);
@@ -488,13 +488,10 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 			g_logger_error("This should never be hit. Realloc was called with memory that wasn't allocated by this library.");
 		}
 
-		if (oldMemoryIter->memorySize + (bufferPadding * 2) < numBytes)
-		{
-			// Clear the padding bits after the new allocation just in case the new allocation
-			// is smaller. This way a valid memory write doesn't get misinterpreted as a buffer
-			// overrun
-			setMemoryPaddingPost(newMemory, numBytes);
-		}
+		// Clear the padding bits after the new allocation just in case the new allocation
+		// is smaller. This way a valid memory write doesn't get misinterpreted as a buffer
+		// overrun
+		setMemoryPaddingPost((uint8*)newMemory, numBytes);
 
 		// If we are in a debug build, track all memory allocations to see if we free them all as well
 		gma_DebugMemoryAllocation newTmp = {
