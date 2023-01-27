@@ -38,6 +38,9 @@ void main(void)
 	g_memory_free(memoryCorruptionBufferOverrun);
 
 	uint8* reallocWithNullShouldAlloc = (uint8*)g_memory_realloc(NULL, sizeof(uint8) * 50);
+	// This shouldn't cause a buffer overrun if we make it smaller
+	reallocWithNullShouldAlloc[49] = 'a';
+	reallocWithNullShouldAlloc = (uint8*)g_memory_realloc(reallocWithNullShouldAlloc, sizeof(uint8) * 30);
 	g_memory_free(reallocWithNullShouldAlloc);
 
 	uint8* leakReallocWithNull = (uint8*)g_memory_realloc(NULL, sizeof(uint8) * 27);

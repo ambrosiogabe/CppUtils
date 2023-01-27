@@ -368,6 +368,24 @@ void g_memory_deinit(void)
 	}
 }
 
+static inline void setMemoryPaddingPost(uint8* memoryBase, size_t numBytes)
+{
+	uint8* memoryBytes = ((uint8*)memoryBase) + numBytes - bufferPadding;
+	for (uint16 i = 0; i < bufferPadding; i++)
+	{
+		memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
+	}
+}
+
+static inline void setMemoryPaddingPre(uint8* memoryBase)
+{
+	uint8* memoryBytes = (uint8*)memoryBase;
+	for (uint16 i = 0; i < bufferPadding; i++)
+	{
+		memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
+	}
+}
+
 void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 {
 	if (trackMemoryAllocations)
@@ -382,17 +400,8 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 		void* memory = malloc(numBytes);
 		if (memory)
 		{
-			uint8* memoryBytes = (uint8*)memory;
-			for (uint16 i = 0; i < bufferPadding; i++)
-			{
-				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
-			}
-
-			memoryBytes = ((uint8*)memory) + numBytes - bufferPadding;
-			for (uint16 i = 0; i < bufferPadding; i++)
-			{
-				memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
-			}
+			setMemoryPaddingPre(memory);
+			setMemoryPaddingPost(memory, numBytes);
 		}
 
 		g_thread_lockMutex(memoryMtx);
@@ -466,58 +475,60 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 		numBytes += bufferPadding * 2 * sizeof(uint8);
 		void* newMemory = realloc(oldMemory, numBytes);
 
-		// If the memory address is the same because realloc resized in-place 
-		// we don't need to do any book-keeping for the memory tracking
-		if (newMemory != oldMemoryIter->memory)
+		if (oldMemoryIter != NULL)
 		{
-			// Realloc could not expand the current pointer, so it allocated a new memory block
-			if (oldMemoryIter != NULL)
+			oldMemoryIter->references--;
+			if (oldMemoryIter->references > 0)
 			{
-				oldMemoryIter->references--;
-				if (oldMemoryIter->references > 0) 
-				{
-					g_logger_error("Tried to reallocate memory that has already been allocated... This should never be hit. If it is, we have a problem.");
-				}
+				g_logger_error("Tried to reallocate memory that has already been allocated... This should never be hit. If it is, we have a problem.");
 			}
-			else 
-			{
-				g_logger_error("This should never be hit. Realloc was called with memory that wasn't allocated by this library.");
-			}
+		}
+		else
+		{
+			g_logger_error("This should never be hit. Realloc was called with memory that wasn't allocated by this library.");
+		}
 
-			// If we are in a debug build, track all memory allocations to see if we free them all as well
-			gma_DebugMemoryAllocation newTmp = {
+		if (oldMemoryIter->memorySize + (bufferPadding * 2) < numBytes)
+		{
+			// Clear the padding bits after the new allocation just in case the new allocation
+			// is smaller. This way a valid memory write doesn't get misinterpreted as a buffer
+			// overrun
+			setMemoryPaddingPost(newMemory, numBytes);
+		}
+
+		// If we are in a debug build, track all memory allocations to see if we free them all as well
+		gma_DebugMemoryAllocation newTmp = {
+			filename,
+			line,
+			0,
+			numBytes,
+			newMemory
+		};
+		gma_DebugMemoryAllocation* newMemoryIter = gma_DebugMemoryAllocation_find(&allocations, &newTmp);
+		if (newMemoryIter == NULL)
+		{
+			gma_DebugMemoryAllocation newAlloc = {
 				filename,
 				line,
-				0,
+				1,
 				numBytes,
 				newMemory
 			};
-			gma_DebugMemoryAllocation* newMemoryIter = gma_DebugMemoryAllocation_find(&allocations, &newTmp);
-			if (newMemoryIter == NULL)
+			gma_DebugMemoryAllocation_push(&allocations, &newAlloc);
+		}
+		else
+		{
+			if (newMemoryIter->references <= 0)
 			{
-				gma_DebugMemoryAllocation newAlloc = {
-					filename,
-					line,
-					1,
-					numBytes,
-					newMemory
-				};
-				gma_DebugMemoryAllocation_push(&allocations, &newAlloc);
+				newMemoryIter->references++;
+				newMemoryIter->fileAllocator = filename;
+				newMemoryIter->memorySize = numBytes;
+				newMemoryIter->fileAllocatorLine = line;
+				newMemoryIter->memory = newMemory;
 			}
 			else
 			{
-				if (newMemoryIter->references <= 0)
-				{
-					newMemoryIter->references++;
-					newMemoryIter->fileAllocator = filename;
-					newMemoryIter->memorySize = numBytes;
-					newMemoryIter->fileAllocatorLine = line;
-					newMemoryIter->memory = newMemory;
-				}
-				else
-				{
-					g_logger_error("Tried to allocate memory that has already been allocated... This should never be hit. If it is, we have a problem.");
-				}
+				g_logger_error("Tried to allocate memory that has already been allocated... This should never be hit. If it is, we have a problem.");
 			}
 		}
 
