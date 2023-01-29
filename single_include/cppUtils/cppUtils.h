@@ -182,18 +182,18 @@ typedef uint64_t uint64;
 #define g_memory_realloc(memory, newSize) _g_memory_realloc(__FILE__, __LINE__, memory, newSize)
 #define g_memory_free(memory) _g_memory_free(__FILE__, __LINE__, memory)
 
-GABE_CPP_UTILS_API void *_g_memory_allocate(const char *filename, int line, size_t numBytes);
-GABE_CPP_UTILS_API void *_g_memory_realloc(const char *filename, int line, void *memory, size_t newSize);
-GABE_CPP_UTILS_API void _g_memory_free(const char *filename, int line, void *memory);
+GABE_CPP_UTILS_API void* _g_memory_allocate(const char* filename, int line, size_t numBytes);
+GABE_CPP_UTILS_API void* _g_memory_realloc(const char* filename, int line, void* memory, size_t newSize);
+GABE_CPP_UTILS_API void _g_memory_free(const char* filename, int line, void* memory);
 
 GABE_CPP_UTILS_API void g_memory_init(bool detectMemoryLeaks);
 GABE_CPP_UTILS_API void g_memory_init_padding(bool detectMemoryLeaks, uint16 bufferPadding);
 GABE_CPP_UTILS_API void g_memory_deinit(void);
 GABE_CPP_UTILS_API void g_memory_dumpMemoryLeaks(void);
 
-GABE_CPP_UTILS_API int g_memory_compareMem(void *a, void *b, size_t numBytes);
-GABE_CPP_UTILS_API void g_memory_zeroMem(void *memory, size_t numBytes);
-GABE_CPP_UTILS_API void g_memory_copyMem(void *dst, void *src, size_t numBytes);
+GABE_CPP_UTILS_API int g_memory_compareMem(void* a, void* b, size_t numBytes);
+GABE_CPP_UTILS_API void g_memory_zeroMem(void* memory, size_t numBytes);
+GABE_CPP_UTILS_API void g_memory_copyMem(void* dst, void* src, size_t numBytes);
 
 // ----------------------------------
 // Logging Utils
@@ -224,11 +224,11 @@ typedef enum g_logger_level {
 #endif
 
 
-GABE_CPP_UTILS_API void _g_logger_log(const char *filename, int line, const char *format, ...);
-GABE_CPP_UTILS_API void _g_logger_info(const char *filename, int line, const char *format, ...);
-GABE_CPP_UTILS_API void _g_logger_warning(const char *filename, int line, const char *format, ...);
-GABE_CPP_UTILS_API void _g_logger_error(const char *filename, int line, const char *format, ...);
-GABE_CPP_UTILS_API void _g_logger_assert(const char *filename, int line, int condition, const char *format, ...);
+GABE_CPP_UTILS_API void _g_logger_log(const char* filename, int line, const char* format, ...);
+GABE_CPP_UTILS_API void _g_logger_info(const char* filename, int line, const char* format, ...);
+GABE_CPP_UTILS_API void _g_logger_warning(const char* filename, int line, const char* format, ...);
+GABE_CPP_UTILS_API void _g_logger_error(const char* filename, int line, const char* format, ...);
+GABE_CPP_UTILS_API void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...);
 
 GABE_CPP_UTILS_API void g_logger_set_level(g_logger_level level);
 GABE_CPP_UTILS_API g_logger_level g_logger_get_level(void);
@@ -247,9 +247,9 @@ GABE_CPP_UTILS_API void g_logger_set_log_directory(const char *directory);
 // mutexes and not single-multithread-process mutexes
 
 GABE_CPP_UTILS_API void *g_thread_createMutex(void);
-GABE_CPP_UTILS_API void g_thread_lockMutex(void *mtx);
-GABE_CPP_UTILS_API void g_thread_releaseMutex(void *mtx);
-GABE_CPP_UTILS_API void g_thread_freeMutex(void *mtx);
+GABE_CPP_UTILS_API void g_thread_lockMutex(void* mtx);
+GABE_CPP_UTILS_API void g_thread_releaseMutex(void* mtx);
+GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx);
 
 #if __cplusplus
 } // extern "C"
