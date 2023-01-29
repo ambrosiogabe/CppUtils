@@ -236,7 +236,7 @@ GABE_CPP_UTILS_API g_logger_level g_logger_get_level(void);
 GABE_CPP_UTILS_API void g_logger_init(void);
 GABE_CPP_UTILS_API void g_logger_free(void);
 
-GABE_CPP_UTILS_API void g_logger_set_log_directory(const char *directory);
+GABE_CPP_UTILS_API void g_logger_set_log_directory(const char* directory);
 
 // ----------------------------------
 // Thread safety utils
@@ -246,7 +246,7 @@ GABE_CPP_UTILS_API void g_logger_set_log_directory(const char *directory);
 // You should use a different library if you need interprocess
 // mutexes and not single-multithread-process mutexes
 
-GABE_CPP_UTILS_API void *g_thread_createMutex(void);
+GABE_CPP_UTILS_API void* g_thread_createMutex(void);
 GABE_CPP_UTILS_API void g_thread_lockMutex(void* mtx);
 GABE_CPP_UTILS_API void g_thread_releaseMutex(void* mtx);
 GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx);
