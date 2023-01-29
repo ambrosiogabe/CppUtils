@@ -3,18 +3,16 @@ cmake_minimum_required(VERSION 3.6)
 project(
     CppUtils
     VERSION 1.0
-    LANGUAGES C CXX
+    LANGUAGES C
 )
 
 file(GLOB_RECURSE CppUtilsC_SRC
     "single_include/*.h"
-    "single_include/*.hpp"
     "single_include/*.c"
 )
 
 file(GLOB_RECURSE CppUtilsCpp_SRC
     "single_include/*.h"
-    "single_include/*.hpp"
     "single_include/*.cpp"
 )
 
