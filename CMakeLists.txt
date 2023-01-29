@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION 3.6)
 project(
     CppUtils
     VERSION 1.0
-    LANGUAGES C
 )
 
 file(GLOB_RECURSE CppUtilsC_SRC
