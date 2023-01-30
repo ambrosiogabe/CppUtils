@@ -43,7 +43,7 @@
  g_memory_init(bool detectMemoryLeaks);
  g_memory_init_padding(bool detectMemoryLeaks, uint16 bufferPadding)
   - detectMemoryLeaks   -- Set this to true to detect memory corruption/leaks. When this is set to
-						   false, this is simply a wrapper around std::malloc, std::realloc, etc.
+						   false, this is simply a wrapper around malloc, realloc, etc.
   - bufferPadding       -- This is how many extra bytes will be allocated at the start and end of
 						   each memory allocation. I advise that you set this to a very low
 						   number, like 1-2 bytes, if you plan on releasing your app with this turned on.
@@ -151,24 +151,29 @@
 #ifndef GABE_CPP_UTILS_H
 #define GABE_CPP_UTILS_H
 
+#if __cplusplus
+extern "C" {
+#endif
+
 // Override this define to add DLL support on your platform
-#ifndef GABE_CPP_UTILS_API 
-#define GABE_CPP_UTILS_API 
+#ifndef GABE_CPP_UTILS_API
+#define GABE_CPP_UTILS_API
 #endif
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <time.h>
 
 // ----------------------------------
 // Memory Utils
 // ----------------------------------
-typedef int8_t  int8;
+typedef int8_t int8;
 typedef int16_t int16;
 typedef int32_t int32;
 typedef int64_t int64;
 
-typedef uint8_t  uint8;
+typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
@@ -193,8 +198,7 @@ GABE_CPP_UTILS_API void g_memory_copyMem(void* dst, void* src, size_t numBytes);
 // ----------------------------------
 // Logging Utils
 // ----------------------------------
-typedef enum g_logger_level
-{
+typedef enum g_logger_level {
 	g_logger_level_All = 0,
 	g_logger_level_Log = 1,
 	g_logger_level_Info = 2,
@@ -238,7 +242,7 @@ GABE_CPP_UTILS_API void g_logger_set_log_directory(const char* directory);
 // Thread safety utils
 // ----------------------------------
 
-// These "mutexes" are really Win32 critical sections
+// These "mutexes" are really Win32 critical sections or pthread mutexes.
 // You should use a different library if you need interprocess
 // mutexes and not single-multithread-process mutexes
 
@@ -247,16 +251,22 @@ GABE_CPP_UTILS_API void g_thread_lockMutex(void* mtx);
 GABE_CPP_UTILS_API void g_thread_releaseMutex(void* mtx);
 GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx);
 
+#if __cplusplus
+} // extern "C"
+#endif
+
 #endif // GABE_CPP_UTILS_H
-
-
-
 
 
 // ===================================================================================
 // Implementation
 // ===================================================================================
 #ifdef GABE_CPP_UTILS_IMPL
+
+#if __cplusplus
+extern "C" {
+#endif
+
 #include <memory.h>
 
 // Common includes
@@ -274,6 +284,8 @@ GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx);
 // For mutex on Windows
 #include <synchapi.h>
 #pragma warning( pop )
+#elif __linux__
+#include <pthread.h>
 #endif
 
 // Forward declarations
@@ -639,6 +651,21 @@ void g_memory_copyMem(void* dst, void* src, size_t numBytes)
 // Logging Implementation Common C11
 // ----------------------------------
 
+static struct tm _g_logger_localtime() {
+	time_t now;
+	time(&now);
+
+	struct tm localTime;
+
+#if _WIN32
+	localtime_s(&localTime, &now);
+#else
+	localtime_r(&now, &localTime);
+#endif
+
+	return localTime;
+}
+
 // Initialize these variables just in case init isn't called for some reason
 static g_logger_level log_level = g_logger_level_All;
 
@@ -693,10 +720,7 @@ void g_logger_set_log_directory(const char* directory)
 #define maxPath 261
 	char timebuf[maxPath] = { 0 };
 
-	time_t now;
-	time(&now);
-	struct tm localTime;
-	localtime_s(&localTime, &now);
+	struct tm localTime = _g_logger_localtime();
 	strftime(timebuf, sizeof(timebuf), "/log_%Y-%m-%d_%I_%M_%S.txt", &localTime);
 
 	size_t filenameLength = strlen(timebuf);
@@ -719,7 +743,7 @@ void g_logger_set_log_directory(const char* directory)
 	memcpy(logFilePath + (sizeof(char) * dirStringLength), timebuf, sizeof(char) * filenameLength);
 	logFilePath[dirStringLength + filenameLength] = '\0';
 
-	fopen_s(&logFile, logFilePath, "wb");
+	logFile = fopen(logFilePath, "wb");
 	if (!logFile)
 	{
 		printf("Failed to open file '%s' to log to. Please make sure the log directory exists, otherwise this will fail.", directory);
@@ -1005,19 +1029,16 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 #elif defined(__linux__) // end LOGGING_IMPL_WIN32
 // begin LOGGING_IMPL_LINUX
 
-#include <csignal>
+#include <signal.h>
 
-namespace ColorCode
-{
-	const char* KNRM = "\x1B[0m";
-	const char* KRED = "\x1B[31m";
-	const char* KGRN = "\x1B[32m";
-	const char* KYEL = "\x1B[33m";
-	const char* KBLU = "\x1B[34m";
-	const char* KMAG = "\x1B[35m";
-	const char* KCYN = "\x1B[36m";
-	const char* KWHT = "\x1B[37m";
-}
+static const char* _G_COLOR_CODE_RESET = "\x1B[0m";
+static const char* _G_COLOR_CODE_RED = "\x1B[31m";
+static const char* _G_COLOR_CODE_GREEN = "\x1B[32m";
+static const char* _G_COLOR_CODE_YELLOW = "\x1B[33m";
+static const char* _G_COLOR_CODE_BLUE = "\x1B[34m";
+static const char* _G_COLOR_CODE_MAGENTA = "\x1B[35m";
+static const char* _G_COLOR_CODE_CYAN = "\x1B[36m";
+static const char* _G_COLOR_WHITE = "\x1B[37m";
 
 void _g_logger_log(const char* filename, int line, const char* format, ...)
 {
@@ -1025,12 +1046,12 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 	{
 		g_thread_lockMutex(logMutex);
 
-		printf("%s%s (line %d) Log: \n", ColorCode::KBLU, filename, line);
+		printf("%s%s (line %d) Log: \n", _G_COLOR_CODE_BLUE, filename, line);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		struct tm now = _g_logger_localtime();
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
-		printf("%s[%s]: ", ColorCode::KNRM, buf);
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
+		printf("%s[%s]: ", _G_COLOR_CODE_RESET, buf);
 
 		va_list args;
 		va_start(args, format);
@@ -1062,12 +1083,12 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 	{
 		g_thread_lockMutex(logMutex);
 
-		printf("%s%s (line %d) Info: \n", ColorCode::KGRN, filename, line);
+		printf("%s%s (line %d) Info: \n", _G_COLOR_CODE_GREEN, filename, line);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		struct tm now = _g_logger_localtime();
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
-		printf("%s[%s]: ", ColorCode::KNRM, buf);
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
+		printf("%s[%s]: ", _G_COLOR_CODE_RESET, buf);
 
 		va_list args;
 		va_start(args, format);
@@ -1099,12 +1120,12 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 	{
 		g_thread_lockMutex(logMutex);
 
-		printf("%s%s (line %d) Warning: \n", ColorCode::KYEL, filename, line);
+		printf("%s%s (line %d) Warning: \n", _G_COLOR_CODE_YELLOW, filename, line);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		struct tm now = _g_logger_localtime();
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
-		printf("%s[%s]: ", ColorCode::KNRM, buf);
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
+		printf("%s[%s]: ", _G_COLOR_CODE_RESET, buf);
 
 		va_list args;
 		va_start(args, format);
@@ -1136,12 +1157,12 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 	{
 		g_thread_lockMutex(logMutex);
 
-		printf("%s%s (line %d) Error: \n", ColorCode::KRED, filename, line);
+		printf("%s%s (line %d) Error: \n", _G_COLOR_CODE_RED, filename, line);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		struct tm now = _g_logger_localtime();
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
-		printf("%s[%s]: ", ColorCode::KNRM, buf);
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
+		printf("%s[%s]: ", _G_COLOR_CODE_RESET, buf);
 
 		va_list args;
 		va_start(args, format);
@@ -1175,12 +1196,12 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 		{
 			g_thread_lockMutex(logMutex);
 
-			printf("%s%s (line %d) Assertion Failure: \n", ColorCode::KRED, filename, line);
+			printf("%s%s (line %d) Assertion Failure: \n", _G_COLOR_CODE_RED, filename, line);
 
-			std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+			struct tm now = _g_logger_localtime();
 			char buf[20] = { 0 };
-			std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
-			printf("%s[%s]: ", ColorCode::KNRM, buf);
+			strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
+			printf("%s[%s]: ", _G_COLOR_CODE_RESET, buf);
 
 			va_list args;
 			va_start(args, format);
@@ -1202,7 +1223,7 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 				fprintf(logFile, "\n");
 			}
 
-			std::raise(SIGINT);
+			raise(SIGINT);
 			g_logger_free();
 			g_thread_releaseMutex(logMutex);
 
@@ -1222,9 +1243,9 @@ void _g_logger_log(const char* filename, int line, const char* format, ...)
 
 		printf("%s (line %d) Log: \n", filename, line);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		struct tm now = _g_logger_localtime();
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -1259,9 +1280,9 @@ void _g_logger_info(const char* filename, int line, const char* format, ...)
 
 		printf("%s (line %d) Info: \n", filename, line);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		struct tm now = _g_logger_localtime();
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -1296,9 +1317,9 @@ void _g_logger_warning(const char* filename, int line, const char* format, ...)
 
 		printf("%s (line %d) Warning: \n", filename, line);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		struct tm now = _g_logger_localtime();
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -1333,9 +1354,9 @@ void _g_logger_error(const char* filename, int line, const char* format, ...)
 
 		printf("%s (line %d) Error: \n", filename, line);
 
-		std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		struct tm now = _g_logger_localtime();
 		char buf[20] = { 0 };
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+		strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
 		printf("[%s]: ", buf);
 
 		va_list args;
@@ -1372,9 +1393,9 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 
 			printf("%s (line %d) Assertion Failure: \n", filename, line);
 
-			std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+			struct tm now = _g_logger_localtime();
 			char buf[20] = { 0 };
-			std::strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", std::localtime(&now));
+			strftime(buf, sizeof(buf), "%Y-%m-%d %I:%M:%S", &now);
 			printf("[%s]: ", buf);
 
 			va_list args;
@@ -1465,27 +1486,52 @@ static void g_thread_freeMutexUntracked(void* mtx)
 #elif defined(__linux__) // End ThreadImpl _WIN32
 // Begin ThreadImpl Linux
 
-GABE_CPP_UTILS_API void* g_thread_createMutex() n
+GABE_CPP_UTILS_API void* g_thread_createMutex()
 {
-	g_logger_assert(false, "TODO: Implement me.");
+	pthread_mutex_t* mutex = (pthread_mutex_t*) g_memory_allocate(sizeof(pthread_mutex_t));
+	pthread_mutex_init(mutex, NULL);
+	return mutex;
 }
 
 GABE_CPP_UTILS_API void g_thread_lockMutex(void* mtx)
 {
-	g_logger_assert(false, "TODO: Implement me.");
+	pthread_mutex_lock((pthread_mutex_t*) mtx);
 }
 
 GABE_CPP_UTILS_API void g_thread_releaseMutex(void* mtx)
 {
-	g_logger_assert(false, "TODO: Implement me.");
+	pthread_mutex_unlock((pthread_mutex_t*) mtx);
 }
 
 GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx)
 {
-	g_logger_assert(false, "TODO: Implement me.");
+	pthread_mutex_destroy((pthread_mutex_t*) mtx);
+	g_memory_free(mtx);
+}
+
+static void* g_thread_createMutexUntracked(void) {
+	pthread_mutex_t *mtx = (pthread_mutex_t*) malloc(sizeof(pthread_mutex_t));
+
+	if (mtx) {
+		pthread_mutex_init(mtx, NULL);
+	}
+
+	return mtx;
+}
+
+static void g_thread_freeMutexUntracked(void* mutex) {
+	if (mutex) {
+		pthread_mutex_destroy((pthread_mutex_t*) mutex);
+		free(mutex);
+	}
 }
 
 #endif // End ThreadImpl Linux
+
+#if __cplusplus
+} // extern "C"
+#endif
+
 #endif // CPP_UTILS_IMPL
 
 /*
