@@ -160,6 +160,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // ----------------------------------
 // Memory Utils
 // ----------------------------------
@@ -246,6 +250,10 @@ GABE_CPP_UTILS_API void* g_thread_createMutex(void);
 GABE_CPP_UTILS_API void g_thread_lockMutex(void* mtx);
 GABE_CPP_UTILS_API void g_thread_releaseMutex(void* mtx);
 GABE_CPP_UTILS_API void g_thread_freeMutex(void* mtx);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // GABE_CPP_UTILS_H
 
