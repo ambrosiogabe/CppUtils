@@ -16,6 +16,7 @@ void main(void)
 	g_logger_init();
 	g_logger_set_level(g_logger_level_All);
 	g_logger_set_log_directory("C:/dev/C++/CppUtils/logs");
+
 	g_logger_info("Some information.");
 	g_logger_warning("A warning!");
 	g_logger_error("This is an error...");
@@ -44,6 +45,10 @@ void main(void)
 	g_memory_free(reallocWithNullShouldAlloc);
 
 	uint8* leakReallocWithNull = (uint8*)g_memory_realloc(NULL, sizeof(uint8) * 27);
+
+	int a = 10;
+	int b = 10;
+	g_logger_assert(g_memory_compareMem(&a, sizeof(int), &b, sizeof(int)) == TRUE, "Bad memcmp function.");
 
 	g_memory_dumpMemoryLeaks();
 
