@@ -46,6 +46,9 @@ struct g_DumbString
 g_DumbString g_dumbString_new(const char* rawString);
 void g_dumbString_free(g_DumbString& string);
 
+inline size_t g_dumbString_asciiLength(const g_DumbString& string) { return string.numBytes; }
+size_t g_dumbString_utf8Length(const g_DumbString& string);
+
 bool operator==(const g_DumbString& a, const g_DumbString& b);
 std::ostream& operator<<(std::ostream& ostream, const g_DumbString& str);
 
@@ -90,6 +93,13 @@ void g_dumbString_free(g_DumbString& string)
 {
 	g_memory_free(string.str);
 	g_memory_zeroMem(&string, sizeof(g_DumbString));
+}
+
+
+size_t g_dumbString_utf8Length(const g_DumbString&)
+{
+	// TODO: Implement me
+	return 0;
 }
 
 bool operator==(const g_DumbString& a, const g_DumbString& b)

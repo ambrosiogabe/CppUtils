@@ -41,6 +41,10 @@
 #define GABE_CPP_PRINT_API
 #endif
 
+#ifndef USE_GABE_CPP_PRINT
+#define USE_GABE_CPP_PRINT
+#endif
+
 GABE_CPP_PRINT_API void g_io_printf(const char* s);
 GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length);
 
