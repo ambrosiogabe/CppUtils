@@ -215,16 +215,28 @@ extern "C" {
 		g_logger_level_None = 6,
 	} g_logger_level;
 
+#ifdef _WIN32
+typedef unsigned short WORD;
+
+// NOTE: These are just taken from consoleapi2.h to avoid polluting global namespace
+//       with a bunch of useless headers
+const WORD g_logger_FOREGROUND_BLUE = 0x0001; // text color contains blue.
+const WORD g_logger_FOREGROUND_GREEN = 0x0002; // text color contains green.
+const WORD g_logger_FOREGROUND_RED = 0x0004; // text color contains red.
+const WORD g_logger_BACKGROUND_BLUE = 0x0010; // background color contains blue.
+const WORD g_logger_BACKGROUND_GREEN = 0x0020; // background color contains green.
+const WORD g_logger_BACKGROUND_RED = 0x0040; // background color contains red.
+#endif
+
 #ifndef USE_GABE_CPP_PRINT
 #ifdef _WIN32
 #define VA_ARGS(...) , ##__VA_ARGS__
-#define g_logger_log(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Log, FOREGROUND_BLUE | FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
-#define g_logger_info(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Info, FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
-#define g_logger_warning(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Warning, FOREGROUND_GREEN | FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
-#define g_logger_error(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Error, FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
+#define g_logger_log(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Log, g_logger_FOREGROUND_BLUE | g_logger_FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
+#define g_logger_info(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Info, g_logger_FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
+#define g_logger_warning(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Warning, g_logger_FOREGROUND_GREEN | g_logger_FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
+#define g_logger_error(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Error, g_logger_FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
 #define g_logger_assert(condition, format, ...) _g_logger_assert(__FILE__, __LINE__, condition, format, __VA_ARGS__)
 
-	typedef unsigned short WORD;
 	GABE_CPP_UTILS_API void _g_logger_cStdCommonPrint(const char* filename, int line, g_logger_level level, WORD color, const char* format, ...);
 #elif defined(unix) || defined(__unix) || defined(__unix__)
 #define g_logger_log(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Log, ColorCode::KBLU, format,##__VA_ARGS__)
@@ -272,7 +284,6 @@ extern "C" {
 
 #ifdef _WIN32
 
-typedef unsigned short WORD;
 GABE_CPP_UTILS_API void _g_logger_printPreamble(const char* filename, int line, char* buf, size_t bufSize, WORD color);
 GABE_CPP_UTILS_API void _g_logger_printPostamble(const char* filename, int line, char* buf, size_t bufSize);
 
@@ -307,10 +318,10 @@ GABE_CPP_UTILS_API void _g_logger_gabeAssert(const char* filename, int line, boo
 }
 
 #define VA_ARGS(...) , ##__VA_ARGS__
-#define g_logger_log(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Log, FOREGROUND_BLUE | FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
-#define g_logger_info(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Info, FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
-#define g_logger_warning(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Warning, FOREGROUND_GREEN | FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
-#define g_logger_error(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Error, FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
+#define g_logger_log(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Log, g_logger_FOREGROUND_BLUE | g_logger_FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
+#define g_logger_info(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Info, g_logger_FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
+#define g_logger_warning(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Warning, g_logger_FOREGROUND_GREEN | g_logger_FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
+#define g_logger_error(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Error, g_logger_FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
 #define g_logger_assert(condition, format, ...) _g_logger_gabeAssert(__FILE__, __LINE__, condition, format, __VA_ARGS__)
 
 #endif // _WIN32
@@ -875,7 +886,7 @@ void _g_logger_assertGabePreamble(const char* filename, int line, char* buf, siz
 {
 	g_thread_lockMutex(logMutex);
 
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), g_logger_FOREGROUND_RED);
 	g_io_printf("{} (line {}) Assertion Failure: \n", filename, line);
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
@@ -983,7 +994,7 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 			);
 			offset = strlen(fullErrorMessageBuffer);
 
-			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), FOREGROUND_RED);
+			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), g_logger_FOREGROUND_RED);
 			printf("%s (line %d) Assertion Failure: \n", filename, line);
 			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
