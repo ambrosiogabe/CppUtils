@@ -46,6 +46,10 @@ void main(void)
 
 	uint8* leakReallocWithNull = (uint8*)g_memory_realloc(NULL, sizeof(uint8) * 27);
 
+	int a = 10;
+	int b = 10;
+	g_logger_assert(g_memory_compareMem(&a, sizeof(int), &b, sizeof(int)) == TRUE, "Bad memcmp function.");
+
 	g_memory_dumpMemoryLeaks();
 
 	g_logger_assert(true, "We shouldn't see this.");

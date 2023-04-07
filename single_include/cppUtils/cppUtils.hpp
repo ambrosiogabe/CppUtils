@@ -190,7 +190,7 @@ GABE_CPP_UTILS_API void g_memory_init_padding(bool detectMemoryLeaks, uint16 buf
 GABE_CPP_UTILS_API void g_memory_deinit(void);
 GABE_CPP_UTILS_API void g_memory_dumpMemoryLeaks(void);
 
-GABE_CPP_UTILS_API int g_memory_compareMem(void* a, void* b, size_t numBytes);
+GABE_CPP_UTILS_API bool g_memory_compareMem(void* a, size_t aLength, void* b, size_t bLength);
 GABE_CPP_UTILS_API void g_memory_zeroMem(void* memory, size_t numBytes);
 GABE_CPP_UTILS_API void g_memory_copyMem(void* dst, void* src, size_t numBytes);
 
@@ -627,9 +627,10 @@ void g_memory_dumpMemoryLeaks(void)
 	g_thread_releaseMutex(memoryMtx);
 }
 
-int g_memory_compareMem(void* a, void* b, size_t numBytes)
+bool g_memory_compareMem(void* a, size_t aLength, void* b, size_t bLength)
 {
-	return memcmp(a, b, numBytes);
+	if (aLength != bLength) return FALSE;
+	return (memcmp(a, b, bLength) == 0);
 }
 
 void g_memory_zeroMem(void* memory, size_t numBytes)
