@@ -56,13 +56,16 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 	{
 		if (s[i] == '{' && fmtStart == SIZE_MAX)
 		{
-			fmtStart = i;
+			if (i < length - 1 && s[i + 1] != '{')
+			{
+				fmtStart = i;
+			}
+			else
+			{
+				std::cout << '{';
+				i++;
+			}
 			continue;
-		}
-
-		if (s[i] == '{' && fmtStart == i - 1)
-		{
-			fmtStart = SIZE_MAX;
 		}
 
 		if (fmtStart != SIZE_MAX)

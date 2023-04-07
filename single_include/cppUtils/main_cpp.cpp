@@ -116,7 +116,7 @@ int main()
 
 		Vec2 vec2 = Vec2{ 0.3f, 2.1f };
 
-		g_logger_log("Hello World! My Vec2: {}", vec2);
+		g_logger_log("Hello World! My Vec2: {}", vec2); 
 		g_logger_info("Pi: {}", 3.14f);
 		g_logger_warning("Warning: {}", "Raw string literal");
 		g_logger_error("Error: {}", std::string("C++ string object"));
