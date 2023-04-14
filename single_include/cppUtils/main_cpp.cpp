@@ -140,6 +140,29 @@ int main()
 			(uint64)UINT64_MAX
 		);
 
+		g_logger_info("Testing some floats:\n"
+			" INFINITE: {}\n"
+			"-INFINITE: {}\n"
+			"      NAN: {}\n"
+			"     0.32: {}\n"
+			"  1.22223: {}\n"
+			" 1.999999: {}\n"
+			"      2.0: {}\n"
+			"  2.00001: {}\n"
+			"      0.0: {}\n"
+			"  1.25e10: {}\n",
+			(float)INFINITY,
+			-1.0f * (float)INFINITY,
+			NAN,
+			0.32f,
+			1.22223f,
+			1.999999f,
+			2.0f,
+			2.00001f,
+			0.0f,
+			1.25e10f
+		);
+
 		g_logger_info("Vec2: {}", vec2);
 	}
 

@@ -165,22 +165,23 @@ GABE_CPP_PRINT_API void g_io_printf(const char* s, const T& value, const Args&..
 // -------------------- Common --------------------
 g_cppPrint_io g_cppPrint_stdout = {};
 
-template<>
-g_cppPrint_io& operator<<(g_cppPrint_io& io, float const&)
-{
-	g_io_printf("TODO: Implement float <<");
-	return io;
-}
-
 template<typename T>
-static void printInteger(char* buffer, size_t bufferSize, T integer)
+static size_t integerToString(char* buffer, size_t bufferSize, T integer)
 {
-	char* bufferPtr = &buffer[0] + bufferSize - 1;
+	size_t numDigits = integer != 0
+		? (size_t)floor(log10((double)(integer < 0 ? -1 * integer : integer)) + 1.0) + (integer < 0 ? 1 : 0)
+		: 1;
+	if (numDigits > bufferSize)
+	{
+		numDigits = bufferSize;
+	}
+
+	char* bufferPtr = (char*)buffer + ((numDigits - 1) * sizeof(char));
 	T n = integer;
 	do
 	{
 		int valMod10 = n % 10;
-		*bufferPtr = valMod10 >= 0 
+		*bufferPtr = valMod10 >= 0
 			? (char)(valMod10 + '0')
 			: (char)((-1 * valMod10) + '0');
 		n = n / 10;
@@ -193,7 +194,141 @@ static void printInteger(char* buffer, size_t bufferSize, T integer)
 		bufferPtr--;
 	}
 
-	_g_io_printf_internal(bufferPtr + 1, (buffer + bufferSize) - bufferPtr - 1);
+	return numDigits;
+}
+
+template<typename T>
+static size_t realNumberToString(T const& number, char* const buffer, size_t bufferSize, float precision, int expCutoff)
+{
+	static_assert(std::is_floating_point<T>(), "printRealNumber only works with floating point digits.");
+
+	// Handle special cases
+	if (isinf(number))
+	{
+		char* bufferPtr = buffer;
+		if (number > 0)
+		{
+			if (bufferSize >= sizeof("inf"))
+			{
+				*bufferPtr++ = 'i';
+				*bufferPtr++ = 'n';
+				*bufferPtr++ = 'f';
+				return sizeof("inf") - 1;
+			}
+
+			return 0;
+		}
+
+		if (bufferSize >= sizeof("-inf"))
+		{
+			*bufferPtr++ = '-';
+			*bufferPtr++ = 'i';
+			*bufferPtr++ = 'n';
+			*bufferPtr++ = 'f';
+			return sizeof("-inf") - 1;
+		}
+
+		return 0;
+	}
+	else if (isnan(number))
+	{
+		if (bufferSize >= sizeof("nan"))
+		{
+			char* bufferPtr = buffer;
+			*bufferPtr++ = 'n';
+			*bufferPtr++ = 'a';
+			*bufferPtr++ = 'n';
+			return sizeof("nan") - 1;
+		}
+		
+		return 0;
+	}
+	else if (number == (T)0.0f)
+	{
+		if (bufferSize >= sizeof("0.0"))
+		{
+			char* bufferPtr = buffer;
+			*bufferPtr++ = '0';
+			*bufferPtr++ = '.';
+			*bufferPtr++ = '0';
+			return sizeof("0.0") - 1;
+		}
+		
+		return 0;
+	}
+
+	char* bufferPtr = &buffer[0];
+	char* bufferEnd = bufferPtr + bufferSize;
+
+	bool isNegative = number < (T)0.0f;
+	double n = isNegative ? -1.0 * (double)number : (double)number;
+	double inversePrecision = 1.0 / (double)precision;
+	n = round(n * inversePrecision) / inversePrecision;
+
+	// Calculate magnitude
+	int magnitude = (int)log10(n);
+
+	bool useExp = magnitude > expCutoff;
+	int expNumber = 0;
+	if (useExp)
+	{
+		double weight = pow(10.0, (double)magnitude);
+		n = n / weight;
+		expNumber = magnitude;
+		magnitude = 0;
+	}
+
+	if (isNegative)
+	{
+		*(bufferPtr++) = '-';
+	}
+
+	// Setup for scientific notation
+	//if (useExp)
+	//{
+	//	if (magnitude < 0)
+	//	{
+	//		magnitude -= 1.0f;
+	//	}
+	//}
+
+	while (n >= 0.0 + (double)precision && buffer != bufferEnd)
+	{
+		double weight = pow(10.0, (double)magnitude);
+		int digit = (int)floor(n / weight);
+		n -= (digit * weight);
+		*(bufferPtr++) = (char)('0' + digit);
+		if (magnitude == 0)
+		{
+			*(bufferPtr++) = '.';
+			if (buffer != bufferEnd && n < 0.0 + (double)precision)
+			{
+				// Add trailing 0 if it would otherwise end in a decimal.
+				// So, change 2. -> 2.0
+				*(bufferPtr++) = '0';
+			}
+		}
+		magnitude--;
+	}
+
+	if (useExp && buffer != bufferEnd)
+	{
+		*(bufferPtr++) = 'e';
+		bufferPtr += integerToString(bufferPtr, bufferEnd - bufferPtr, expNumber);
+	}
+
+	return (bufferPtr - buffer);
+}
+
+// Adapted from https://stackoverflow.com/a/7097567
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, float const& number)
+{
+	constexpr size_t bufferSize = 256;
+	char buffer[bufferSize];
+	size_t length = realNumberToString(number, buffer, bufferSize, 0.001f, 5);
+	_g_io_printf_internal(buffer, length);
+	return io;
 }
 
 template<>
@@ -201,7 +336,8 @@ g_cppPrint_io& operator<<(g_cppPrint_io& io, int8_t const& integer)
 {
 	constexpr size_t bufferSize = 4;
 	char buffer[bufferSize];
-	printInteger(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer);
+	_g_io_printf_internal(buffer, length);
 	return io;
 }
 
@@ -210,7 +346,8 @@ g_cppPrint_io& operator<<(g_cppPrint_io& io, int16_t const& integer)
 {
 	constexpr size_t bufferSize = 6;
 	char buffer[bufferSize];
-	printInteger(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer);
+	_g_io_printf_internal(buffer, length);
 	return io;
 }
 
@@ -219,7 +356,8 @@ g_cppPrint_io& operator<<(g_cppPrint_io& io, int32_t const& integer)
 {
 	constexpr size_t bufferSize = 11;
 	char buffer[bufferSize];
-	printInteger(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer);
+	_g_io_printf_internal(buffer, length);
 	return io;
 }
 
@@ -228,7 +366,8 @@ g_cppPrint_io& operator<<(g_cppPrint_io& io, int64_t const& integer)
 {
 	constexpr size_t bufferSize = 20;
 	char buffer[bufferSize];
-	printInteger(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer);
+	_g_io_printf_internal(buffer, length);
 	return io;
 }
 
@@ -237,7 +376,8 @@ g_cppPrint_io& operator<<(g_cppPrint_io& io, uint8_t const& integer)
 {
 	constexpr size_t bufferSize = 3;
 	char buffer[bufferSize];
-	printInteger(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer);
+	_g_io_printf_internal(buffer, length);
 	return io;
 }
 
@@ -246,7 +386,8 @@ g_cppPrint_io& operator<<(g_cppPrint_io& io, uint16_t const& integer)
 {
 	constexpr size_t bufferSize = 5;
 	char buffer[bufferSize];
-	printInteger(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer);
+	_g_io_printf_internal(buffer, length);
 	return io;
 }
 
@@ -255,7 +396,8 @@ g_cppPrint_io& operator<<(g_cppPrint_io& io, uint32_t const& integer)
 {
 	constexpr size_t bufferSize = 10;
 	char buffer[bufferSize];
-	printInteger(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer);
+	_g_io_printf_internal(buffer, length);
 	return io;
 }
 
@@ -265,7 +407,8 @@ g_cppPrint_io& operator<<(g_cppPrint_io& io, uint64_t const& integer)
 	UINT64_MAX;
 	constexpr size_t bufferSize = 20;
 	char buffer[bufferSize];
-	printInteger(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer);
+	_g_io_printf_internal(buffer, length);
 	return io;
 }
 
