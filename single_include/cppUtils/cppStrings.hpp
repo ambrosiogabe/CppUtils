@@ -34,7 +34,6 @@
 #define GABE_CPP_STRINGS_H
 
 #include <stdint.h>
-#include <ostream>
 
 // Should always be UTF8-Encoded
 struct g_DumbString
@@ -50,7 +49,6 @@ inline size_t g_dumbString_asciiLength(const g_DumbString& string) { return stri
 size_t g_dumbString_utf8Length(const g_DumbString& string);
 
 bool operator==(const g_DumbString& a, const g_DumbString& b);
-std::ostream& operator<<(std::ostream& ostream, const g_DumbString& str);
 
 #endif // GABE_CPP_STRINGS_H
 
@@ -105,12 +103,6 @@ size_t g_dumbString_utf8Length(const g_DumbString&)
 bool operator==(const g_DumbString& a, const g_DumbString& b)
 {
 	return g_memory_compareMem(a.str, a.numBytes, b.str, b.numBytes);
-}
-
-std::ostream& operator<<(std::ostream& ostream, const g_DumbString& str)
-{
-	ostream << (const char*)str.str;
-	return ostream;
 }
 
 #endif // GABE_CPP_STRINGS_IMPL

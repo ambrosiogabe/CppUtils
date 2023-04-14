@@ -38,7 +38,7 @@ struct Vec2
 	float y;
 };
 
-std::ostream& operator<<(std::ostream& io, const Vec2& vec)
+g_cppPrint_io& operator<<(g_cppPrint_io& io, const Vec2& vec)
 {
 	io << "{ " << vec.x << ", " << vec.y << " }";
 	return io;
@@ -120,6 +120,25 @@ int main()
 		g_logger_info("Pi: {}", 3.14f);
 		g_logger_warning("Warning: {}", "Raw string literal");
 		g_logger_error("Error: {}", std::string("C++ string object"));
+		g_logger_info("This is a few integers {}, {}, {}, {}, {}, {}", 123, -342342, 0, INT32_MAX, (uint64)INT32_MAX + 1, -7);
+		g_logger_info("Testing all sized integer types:\n"
+			"  int8_t: {}\n"
+			" int16_t: {}\n"
+			" int32_t: {}\n"
+			" int64_t: {}\n"
+			" uint8_t: {}\n"
+			"uint16_t: {}\n"
+			"uint32_t: {}\n"
+			"uint64_t: {}",
+			(int8)INT8_MIN,
+			(int16)INT16_MIN,
+			(int32)INT32_MIN,
+			(int64)INT64_MIN,
+			(uint8)UINT8_MAX,
+			(uint16)UINT16_MAX,
+			(uint32)UINT32_MAX,
+			(uint64)UINT64_MAX
+		);
 
 		g_logger_info("Vec2: {}", vec2);
 	}

@@ -33,7 +33,6 @@
 #ifndef GABE_CPP_PRINT_H
 #define GABE_CPP_PRINT_H
 
-#include <iostream>
 #include <string>
 
 // Override this define to add DLL support on your platform
@@ -45,12 +44,63 @@
 #define USE_GABE_CPP_PRINT
 #endif
 
-GABE_CPP_PRINT_API void g_io_printf(const char* s);
+struct g_DumbString;
+
+struct g_cppPrint_io
+{
+};
+
+extern g_cppPrint_io g_cppPrint_stdout;
+
+template<typename T>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, T const& t);
+
+// Helper for raw string literals and char[N] arrays
+template<std::size_t N>
+using g_cppPrint_sizedCharArray = char[N];
+
+// Specializations for common types
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, float const& number);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, int8_t const& integer);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, int16_t const& integer);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, int32_t const& integer);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, int64_t const& integer);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, uint8_t const& integer);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, uint16_t const& integer);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, uint32_t const& integer);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, uint64_t const& integer);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, g_DumbString const& dumbString);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, const char* const& s);
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, char* const& s);
+template<std::size_t N>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, g_cppPrint_sizedCharArray<N> const& s)
+{
+	_g_io_printf_internal((const char*)s, N);
+	return io;
+}
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, std::string const& str);
+
 GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length);
+
+GABE_CPP_PRINT_API void g_io_printf(const char* s);
 
 template<typename T, typename...Args>
 GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, const T& value, const Args&... args)
 {
+	size_t strLength = 0;
 	size_t fmtStart = SIZE_MAX;
 	for (size_t i = 0; i < length; i++)
 	{
@@ -58,11 +108,13 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 		{
 			if (i < length - 1 && s[i + 1] != '{')
 			{
+				_g_io_printf_internal(s, strLength);
 				fmtStart = i;
 			}
 			else
 			{
-				std::cout << '{';
+				_g_io_printf_internal("{", 1);
+				strLength = 0;
 				i++;
 			}
 			continue;
@@ -73,7 +125,7 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 			// Closing the format string
 			if (s[i] == '}')
 			{
-				std::cout << value;
+				g_cppPrint_stdout << value;
 				// NOTE: Recursively call the variadic template argument, with unpacked variables
 				//       The base case, where there is no args... left is handled in the function
 				//       above
@@ -86,7 +138,7 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 		}
 		else
 		{
-			std::cout << s[i];
+			strLength++;
 		}
 	}
 
@@ -107,6 +159,195 @@ GABE_CPP_PRINT_API void g_io_printf(const char* s, const T& value, const Args&..
 // ------------------------ Implementation ------------------------
 #ifdef GABE_CPP_PRINT_IMPL
 
+#include <cppUtils/cppStrings.hpp>
+#include <string>
+
+// -------------------- Common --------------------
+g_cppPrint_io g_cppPrint_stdout = {};
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, float const&)
+{
+	g_io_printf("TODO: Implement float <<");
+	return io;
+}
+
+template<typename T>
+static void printInteger(char* buffer, size_t bufferSize, T integer)
+{
+	char* bufferPtr = &buffer[0] + bufferSize - 1;
+	T n = integer;
+	do
+	{
+		int valMod10 = n % 10;
+		*bufferPtr = valMod10 >= 0 
+			? (char)(valMod10 + '0')
+			: (char)((-1 * valMod10) + '0');
+		n = n / 10;
+		bufferPtr--;
+	} while (n != 0 && bufferPtr >= buffer);
+
+	if (integer < 0 && bufferPtr >= buffer)
+	{
+		*bufferPtr = '-';
+		bufferPtr--;
+	}
+
+	_g_io_printf_internal(bufferPtr + 1, (buffer + bufferSize) - bufferPtr - 1);
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, int8_t const& integer)
+{
+	constexpr size_t bufferSize = 4;
+	char buffer[bufferSize];
+	printInteger(buffer, bufferSize, integer);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, int16_t const& integer)
+{
+	constexpr size_t bufferSize = 6;
+	char buffer[bufferSize];
+	printInteger(buffer, bufferSize, integer);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, int32_t const& integer)
+{
+	constexpr size_t bufferSize = 11;
+	char buffer[bufferSize];
+	printInteger(buffer, bufferSize, integer);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, int64_t const& integer)
+{
+	constexpr size_t bufferSize = 20;
+	char buffer[bufferSize];
+	printInteger(buffer, bufferSize, integer);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, uint8_t const& integer)
+{
+	constexpr size_t bufferSize = 3;
+	char buffer[bufferSize];
+	printInteger(buffer, bufferSize, integer);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, uint16_t const& integer)
+{
+	constexpr size_t bufferSize = 5;
+	char buffer[bufferSize];
+	printInteger(buffer, bufferSize, integer);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, uint32_t const& integer)
+{
+	constexpr size_t bufferSize = 10;
+	char buffer[bufferSize];
+	printInteger(buffer, bufferSize, integer);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, uint64_t const& integer)
+{
+	UINT64_MAX;
+	constexpr size_t bufferSize = 20;
+	char buffer[bufferSize];
+	printInteger(buffer, bufferSize, integer);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, g_DumbString const& dumbString)
+{
+	_g_io_printf_internal((const char*)dumbString.str, dumbString.numBytes);
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, const char* const& s)
+{
+	_g_io_printf_internal((const char*)s, std::strlen((const char*)s));
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, char* const& s)
+{
+	_g_io_printf_internal((const char*)s, std::strlen((const char*)s));
+	return io;
+}
+
+template<>
+g_cppPrint_io& operator<<(g_cppPrint_io& io, std::string const& str)
+{
+	_g_io_printf_internal((const char*)str.c_str(), str.size());
+	return io;
+}
+
+// -------------------- Platform --------------------
+#ifdef _WIN32
+
+#include <Windows.h>
+#include <stdexcept>
+
+static HANDLE stdoutHandle = NULL;
+
+static void initializeStdoutIfNecessary()
+{
+	if (stdoutHandle == NULL)
+	{
+		stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+		if (stdoutHandle == INVALID_HANDLE_VALUE)
+		{
+			throw std::runtime_error(("Cannot acquire a STD_OUTPUT_HANDLE. Last error: " + std::to_string(GetLastError())).c_str());
+		}
+		else if (stdoutHandle == NULL)
+		{
+			// Running on a device with no dedicated stdout, just pipe the output nowhere in this case
+			throw std::runtime_error("Cannot acquire a STD_OUTPUT_HANDLE. Current device does not support stdout.");
+		}
+	}
+}
+
+void g_io_printf(const char* s)
+{
+	_g_io_printf_internal(s, std::strlen(s));
+}
+
+void _g_io_printf_internal(const char* s, size_t length)
+{
+	initializeStdoutIfNecessary();
+	if (length <= MAXDWORD)
+	{
+		DWORD numBytesWritten;
+		WriteFile(stdoutHandle, s, (DWORD)length, &numBytesWritten, NULL);
+		if (numBytesWritten != length)
+		{
+			throw std::runtime_error("Failed to write to stdout. OOM or something idk.");
+		}
+	}
+	else
+	{
+		std::string errorMessage = "String length is invalid '" + std::to_string(length) + "'. Must be >= 0 && <= " + std::to_string(MAXDWORD);
+		throw std::runtime_error(errorMessage.c_str());
+	}
+}
+
+#else // end _WIN32
+
 void g_io_printf(const char* s)
 {
 	std::cout << s;
@@ -124,4 +365,7 @@ void _g_io_printf_internal(const char* s, size_t length)
 		throw new std::runtime_error(errorMessage.c_str());
 	}
 }
-#endif // GABE_CPP_PRINT_IMPL
+
+#endif // end PLATFORM_IMPLS
+
+#endif // end GABE_CPP_PRINT_IMPL
