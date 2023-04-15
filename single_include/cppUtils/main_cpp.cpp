@@ -53,7 +53,7 @@ g_io_stream& operator<<(g_io_stream& io, const UnknownStruct& foo)
 
 g_io_stream& operator<<(g_io_stream& io, const Vec2& vec)
 {
-	io << "{ " << vec.x << ", " << vec.y << " }";
+	io << "<X:" << vec.x << ", Y:" << vec.y << ">";
 	return io;
 }
 
@@ -182,15 +182,14 @@ int main()
 
 		g_logger_info("{}", 1.2222239f);
 
-		g_io_stream_stdout << vec2;
-		g_logger_info("Vec2: {{ hello {{ there {{ {.3f} continue on printing", vec2);
+		g_logger_info("Vec2: {{ hello {{ there {{ {.2f} continue on printing", vec2);
 
 		UnknownStruct unknown = {
 			2.75f,
 			-280,
 			"Hello sailor!"
 		};
-		g_logger_info("Hey this is unknown: {}", unknown);
+		g_logger_info("Hey this is unknown: {.2f}", unknown);
 
 		const char* actualPtr = "Actually a ptr.";
 		g_logger_info("Hey here's a raw string literal: {} {}", "Raw string literal", actualPtr);
