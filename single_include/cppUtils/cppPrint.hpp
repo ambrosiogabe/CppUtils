@@ -268,15 +268,23 @@ GABE_CPP_PRINT_API void g_io_printf(const char* s, const T& value, const Args&..
 #include <stdexcept>
 
 // -------------------- Common --------------------
+
+// ------ Internal variables ------
 g_io_stream g_io_stream_stdout = {
 	0,
 	0,
 	' ',
-	g_io_stream_align::Left,
+	g_io_stream_align::Right,
 	g_io_stream_paramType::None,
 	g_io_stream_mods::None
 };
 
+// ------ Internal functions ------
+static void _g_io_print_string_formatted(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const g_io_stream& io);
+static const char* _g_io_get_int_prefix(const g_io_stream& io);
+static size_t _g_io_get_int_prefix_size(const g_io_stream& io);
+static const char* _g_io_get_float_prefix(const g_io_stream& io);
+static size_t _g_io_get_float_prefix_size(const g_io_stream& io);
 static inline bool g_io_isWhitespace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
 static inline bool g_io_isDigit(char c) { return c >= '0' && c <= '9'; }
 static inline int32_t g_io_toNumber(char c) { return (int32_t)(c - '0'); }
@@ -301,7 +309,7 @@ static int32_t g_io_parseNextInteger(const char* str, size_t length, size_t* num
 
 	int32_t multiplier = 1;
 	int32_t result = 0;
-	for (size_t i = (cursor - 1); cursor > 0; cursor--)
+	for (int i = (int)(cursor - 1); i >= 0; i--)
 	{
 		// TODO: Do something to handle overflow here
 		result += (multiplier * g_io_toNumber(str[i]));
@@ -517,10 +525,13 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 void g_io_stream::resetModifiers()
 {
-	this->precision = 0;
-	this->width = 0;
+	this->alignment = g_io_stream_align::Right;
 	this->fillCharacter = ' ';
 	this->mods = g_io_stream_mods::None;
+	this->precision = 0;
+	this->sign = g_io_stream_sign::Positive;
+	this->type = g_io_stream_paramType::None;
+	this->width = 0;
 }
 
 template<typename T>
@@ -567,22 +578,12 @@ static char halfByteToHex(uint8_t halfByte, char baseA)
 	return hexDigit;
 }
 
-static size_t integerToHexString(char* const buffer, size_t bufferSize, void* integer, size_t integerSize, bool useCapitalChars, bool addPrefix)
+static size_t integerToHexString(char* const buffer, size_t bufferSize, void* integer, size_t integerSize, bool useCapitalChars)
 {
 	char baseA = useCapitalChars ? 'A' : 'a';
 
 	char* bufferPtr = buffer;
 	char* bufferEnd = (char*)buffer + bufferSize;
-
-	// Add 0x prefix to the hex string if requested
-	if (addPrefix && bufferPtr <= bufferEnd)
-	{
-		*(bufferPtr++) = '0';
-		if (bufferPtr <= bufferEnd)
-		{
-			*(bufferPtr++) = baseA + ('x' - 'a');
-		}
-	}
 
 	// Convert binary number to hex
 	uint8_t* bytePtr = (uint8_t*)(integer)+(integerSize - 1);
@@ -616,8 +617,7 @@ static size_t integerToString(char* const buffer, size_t bufferSize, T integer, 
 		return integerToString(buffer, bufferSize, integer);
 	case g_io_stream_paramType::Hexadecimal:
 		return integerToHexString(buffer, bufferSize, &integer, sizeof(T),
-			(uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier,
-			(uint32_t)io.mods & (uint32_t)g_io_stream_mods::AltFormat);
+			(uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier);
 	}
 
 	throw std::runtime_error("Unknown io stream modifier in integerToString used.");
@@ -790,7 +790,7 @@ g_io_stream& operator<<(g_io_stream& io, float const& number)
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
 	size_t length = realNumberToString((double)number, buffer, bufferSize, io.precision, 5);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_float_prefix(io), _g_io_get_float_prefix_size(io), io);
 	return io;
 }
 
@@ -800,7 +800,7 @@ g_io_stream& operator<<(g_io_stream& io, double const& number)
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
 	size_t length = realNumberToString(number, buffer, bufferSize, io.precision, 5);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_float_prefix(io), _g_io_get_float_prefix_size(io), io);
 	return io;
 }
 
@@ -810,7 +810,7 @@ g_io_stream& operator<<(g_io_stream& io, int8_t const& integer)
 	constexpr size_t bufferSize = 4;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer, io);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
 
@@ -820,7 +820,7 @@ g_io_stream& operator<<(g_io_stream& io, int16_t const& integer)
 	constexpr size_t bufferSize = 6;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer, io);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
 
@@ -830,7 +830,7 @@ g_io_stream& operator<<(g_io_stream& io, int32_t const& integer)
 	constexpr size_t bufferSize = 11;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer, io);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
 
@@ -840,7 +840,7 @@ g_io_stream& operator<<(g_io_stream& io, int64_t const& integer)
 	constexpr size_t bufferSize = 20;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer, io);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
 
@@ -850,7 +850,7 @@ g_io_stream& operator<<(g_io_stream& io, uint8_t const& integer)
 	constexpr size_t bufferSize = 4;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer, io);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
 
@@ -860,7 +860,7 @@ g_io_stream& operator<<(g_io_stream& io, uint16_t const& integer)
 	constexpr size_t bufferSize = 6;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer, io);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
 
@@ -870,7 +870,7 @@ g_io_stream& operator<<(g_io_stream& io, uint32_t const& integer)
 	constexpr size_t bufferSize = 11;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer, io);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
 
@@ -880,36 +880,193 @@ g_io_stream& operator<<(g_io_stream& io, uint64_t const& integer)
 	constexpr size_t bufferSize = 21;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer, io);
-	_g_io_printf_internal(buffer, length);
+	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
 
 template<>
 g_io_stream& operator<<(g_io_stream& io, g_DumbString const& dumbString)
 {
-	_g_io_printf_internal((const char*)dumbString.str, dumbString.numBytes);
+	_g_io_print_string_formatted((const char*)dumbString.str, dumbString.numBytes, "", 0, io);
 	return io;
 }
 
 template<>
 g_io_stream& operator<<(g_io_stream& io, const char* const& s)
 {
-	_g_io_printf_internal((const char*)s, std::strlen((const char*)s));
+	_g_io_print_string_formatted((const char*)s, std::strlen((const char*)s), "", 0, io);
 	return io;
 }
 
 template<>
 g_io_stream& operator<<(g_io_stream& io, char* const& s)
 {
-	_g_io_printf_internal((const char*)s, std::strlen((const char*)s));
+	_g_io_print_string_formatted((const char*)s, std::strlen((const char*)s), "", 0, io);
 	return io;
 }
 
 template<>
 g_io_stream& operator<<(g_io_stream& io, std::string const& str)
 {
-	_g_io_printf_internal((const char*)str.c_str(), str.size());
+	_g_io_print_string_formatted((const char*)str.c_str(), str.size(), "", 0, io);
 	return io;
+}
+
+// ------ Internal functions ------
+static void _g_io_print_string_formatted(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const g_io_stream& io)
+{
+	if (prefixLength > 0)
+	{
+		_g_io_printf_internal(prefix, prefixLength);
+	}
+
+	size_t totalContentLength = prefixLength + contentLength;
+	uint32_t leftPadding = 0;
+	uint32_t rightPadding = 0;
+	if (io.width != 0)
+	{
+		switch (io.alignment)
+		{
+		case g_io_stream_align::Left:
+		{
+			if (io.width > totalContentLength)
+			{
+				rightPadding = (uint32_t)(io.width - totalContentLength);
+			}
+		}
+		break;
+		case g_io_stream_align::Right:
+		{
+			if (io.width > totalContentLength)
+			{
+				leftPadding = (uint32_t)(io.width - totalContentLength);
+			}
+		}
+		break;
+		case g_io_stream_align::Center:
+		{
+			if (io.width > totalContentLength)
+			{
+				leftPadding = (uint32_t)((io.width - totalContentLength) / 2);
+				// Since integer division can truncate, rightPadding will just
+				// take whatever's left
+				rightPadding = (uint32_t)(io.width - totalContentLength - leftPadding);
+			}
+		}
+		break;
+		}
+	}
+
+	// Only allocate scratch memory if needed
+	constexpr size_t smallStringBufferSize = 32;
+	char smallStringBuffer[smallStringBufferSize];
+	char* scratchMemory = (leftPadding + rightPadding) > smallStringBufferSize
+		? (char*)malloc(sizeof(char) * leftPadding + rightPadding)
+		: smallStringBuffer;
+	if (leftPadding > 0)
+	{
+		for (size_t i = 0; i < leftPadding; i++)
+		{
+			scratchMemory[i] = io.fillCharacter;
+		}
+
+		_g_io_printf_internal(scratchMemory, leftPadding);
+	}
+
+	_g_io_printf_internal(content, contentLength);
+
+	if (rightPadding > 0)
+	{
+		for (size_t i = leftPadding; i < rightPadding; i++)
+		{
+			scratchMemory[i] = io.fillCharacter;
+		}
+
+		_g_io_printf_internal(scratchMemory, rightPadding);
+	}
+
+	if (leftPadding + rightPadding > smallStringBufferSize)
+	{
+		free(scratchMemory);
+	}
+}
+
+static const char* _g_io_get_int_prefix(const g_io_stream& io)
+{
+	bool isCaps = (uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier;
+	switch (io.type)
+	{
+	case g_io_stream_paramType::Binary:
+	{
+		if (isCaps)
+		{
+			return "0B";
+		}
+		return "0b";
+	}
+	case g_io_stream_paramType::Octal:
+	{
+		if (isCaps)
+		{
+			return "0C";
+		}
+		return "0c";
+	}
+	case g_io_stream_paramType::Hexadecimal:
+	{
+		if (isCaps)
+		{
+			return "0X";
+		}
+		return "0x";
+	}
+	default:
+		return "";
+	}
+}
+
+static size_t _g_io_get_int_prefix_size(const g_io_stream& io)
+{
+	switch (io.type)
+	{
+	case g_io_stream_paramType::Binary:
+		return sizeof("0b") - 1;
+	case g_io_stream_paramType::Octal:
+		return sizeof("0c") - 1;
+	case g_io_stream_paramType::Hexadecimal:
+		return sizeof("0x") - 1;
+	default:
+		return sizeof("") - 1;
+	}
+}
+
+static const char* _g_io_get_float_prefix(const g_io_stream& io)
+{
+	bool isCaps = (uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier;
+	switch (io.type)
+	{
+	case g_io_stream_paramType::FloatHexadecimal:
+	{
+		if (isCaps)
+		{
+			return "0X";
+		}
+		return "0x";
+	}
+	default:
+		return "";
+	}
+}
+
+static size_t _g_io_get_float_prefix_size(const g_io_stream& io)
+{
+	switch (io.type)
+	{
+	case g_io_stream_paramType::FloatHexadecimal:
+		return sizeof("0x") - 1;
+	default:
+		return sizeof("") - 1;
+	}
 }
 
 // -------------------- Platform --------------------

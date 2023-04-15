@@ -154,18 +154,18 @@ void mainFunc()
 		);
 
 		g_logger_info("Testing some floats:\n"
-			"   INFINITE: {}\n"
-			"  -INFINITE: {}\n"
-			"        NAN: {}\n"
-			"       0.32: {:.9f}\n"
-			" 1.2222239f: {}\n"
-			"   1.999999: {:.3f}\n"
-			"        2.0: {}\n"
-			"    2.00001: {}\n"
-			"        0.0: {}\n"
-			"    1.25e10: {}\n"
-			"0.999999999: {}\n"
-			"   1.25e-10: {}",
+			"   INFINITE: {.:13}\n"
+			"  -INFINITE: {.:13}\n"
+			"        NAN: {.:13}\n"
+			"       0.32: {.:13.9f}\n"
+			" 1.2222239f: {.:13}\n"
+			"   1.999999: {.:13.3f}\n"
+			"        2.0: {.:13}\n"
+			"    2.00001: {.:13}\n"
+			"        0.0: {.:13}\n"
+			"    1.25e10: {.:13}\n"
+			"0.999999999: {.:13}\n"
+			"   1.25e-10: {.:13}",
 			(float)INFINITY,
 			-1.0f * (float)INFINITY,
 			NAN,
@@ -192,14 +192,23 @@ void mainFunc()
 		g_logger_info("Hey this is unknown: {:.2f}", unknown);
 
 		g_logger_log("Here's some hex digits:\n"
-			"    255: {:x}\n"
-			"   -128: {:#x}\n"
+			"    255: {.:10x}\n"
+			"   -128: {0:#x}\n"
 			"1194684: {:#X}\n"
 			"    123: {:#x}",
 			(uint8)255,
 			-128,
 			1194684,
 			(uint16)123);
+
+		g_logger_info("\n"
+			"+{-:^20}+\n"
+			"|{ :^20}|\n"
+			"+{-:^20}+",
+			"",
+			"Hello World!",
+			""
+		);
 	}
 
 	g_memory_dumpMemoryLeaks();
