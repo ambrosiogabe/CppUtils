@@ -61,7 +61,7 @@ g_io_stream& operator<<(g_io_stream& io, const Vec2& vec)
 // library catches it so we disable warnings about unreferenced vars
 #pragma warning( push )
 #pragma warning( disable : 4189)
-int main()
+void mainFunc()
 {
 	g_logger_init();
 	g_logger_set_level(g_logger_level_All);
@@ -129,7 +129,7 @@ int main()
 
 		Vec2 vec2 = Vec2{ 0.3f, 2.1f };
 
-		g_logger_log("Hello World! My Vec2: {}", vec2); 
+		g_logger_log("Hello World! My Vec2: {}", vec2);
 		g_logger_info("Pi: {}", 3.14f);
 		g_logger_warning("Warning: {}", "Raw string literal");
 		g_logger_error("Error: {}", std::string("C++ string object"));
@@ -157,9 +157,9 @@ int main()
 			"   INFINITE: {}\n"
 			"  -INFINITE: {}\n"
 			"        NAN: {}\n"
-			"       0.32: {.9f}\n"
+			"       0.32: {:.9f}\n"
 			" 1.2222239f: {}\n"
-			"   1.999999: {.3f}\n"
+			"   1.999999: {:.3f}\n"
 			"        2.0: {}\n"
 			"    2.00001: {}\n"
 			"        0.0: {}\n"
@@ -182,17 +182,24 @@ int main()
 
 		g_logger_info("{}", 1.2222239f);
 
-		g_logger_info("Vec2: {{ hello {{ there {{ {.2f} continue on printing", vec2);
+		g_logger_info("Vec2: {{ hello {{ there {{ {:.2f} continue on printing", vec2);
 
 		UnknownStruct unknown = {
 			2.75f,
 			-280,
 			"Hello sailor!"
 		};
-		g_logger_info("Hey this is unknown: {.2f}", unknown);
+		g_logger_info("Hey this is unknown: {:.2f}", unknown);
 
-		const char* actualPtr = "Actually a ptr.";
-		g_logger_info("Hey here's a raw string literal: {} {}", "Raw string literal", actualPtr);
+		g_logger_log("Here's some hex digits:\n"
+			"    255: {:x}\n"
+			"   -128: {:#x}\n"
+			"1194684: {:#X}\n"
+			"    123: {:#x}",
+			(uint8)255,
+			-128,
+			1194684,
+			(uint16)123);
 	}
 
 	g_memory_dumpMemoryLeaks();
@@ -201,6 +208,18 @@ int main()
 
 	g_memory_deinit();
 	g_logger_free();
+}
+
+int main()
+{
+	try
+	{
+		mainFunc();
+	}
+	catch (std::exception ex)
+	{
+		printf("\n\nFailed with exception: %s\n", ex.what());
+	}
 
 	return 0;
 }

@@ -17,7 +17,51 @@
 
  -------- DOCUMENTATION --------
 
- TODO: Add me
+ Format specification (adapted from https://fmt.dev/latest/syntax.html)
+
+ Any fields marked with [] are optional, whereas fields marked with () are
+ required.
+
+ If no format is specified, e.g you specify something like print("{}"),
+ then it will use all the default options.
+
+
+   format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
+   fill        ::= <any ASCII character other than "{" | "}" | ":">
+   align       ::= "<" | ">" | "^"
+   sign        ::= "+" | "-" | " "
+   width       ::= integer <max UINT16_MAX>
+   precision   ::= integer <max UINT16_MAX>
+   type        ::= "a" | "A" | "b" | "B" | "c" | "d" | "e" | "E" | "f" | "F" |"g" | "G" |
+				   "o" | "p" | "s" | "x" | "X"
+
+
+   "#": Alternate form. This will display a prefix of 0b for binary, 0x for hex, and 0c for octal.
+
+   ":" Required separator
+
+   ".": Required separator when specifying precision.
+
+   fill: Specifies what kind of character to fill any padded space with. Default ' '
+
+   align: Specifies alignment of content
+		  "<" is Left-align
+		  ">" is right-align
+		  "^" is centered
+
+   sign: "+" Means always display + or - sign for numeric content. Default "-"
+		 " " Means display - for negative numbers, and a padded space for positive numbers
+		 "-" Means only display - for negative numbers and do nothing for positive numbers
+		 "+" = "+3.12" "-3.12"
+		 " " = " 3.12" "-3.12"
+		 "-" = "3.12" "-3.12"
+  width: Minimum width for content to fill. Max width that can be used is UINT16_MAX.
+
+  precision: Number of digits to show after decimal place. Defaults to 6. If the number is truncated
+			 it will be rounded to the next natural decimal place, e.g 4.9999999 -> 5.000000 for precision
+			 of 6. Max precision that can be used is UINT16_MAX.
+
+  type: TODO: Fill this info out
 
 
  -------- DLL STUFF --------
@@ -46,14 +90,15 @@
 
 struct g_DumbString;
 
-enum class g_io_stream_mods
+enum class g_io_stream_mods : uint32_t
 {
-	            None = 0,
-	    PrecisionSet = 1 << 0,
-	 CapitalModifier = 1 << 1,
+	None = 0,
+	PrecisionSet = 1 << 0,
+	CapitalModifier = 1 << 1,
+	AltFormat = 1 << 2,
 };
 
-enum class g_io_stream_paramType
+enum class g_io_stream_paramType : uint16_t
 {
 	None,
 	Binary,
@@ -68,11 +113,29 @@ enum class g_io_stream_paramType
 	Pointer,
 };
 
+enum class g_io_stream_align : uint8_t
+{
+	Left,
+	Right,
+	Center
+};
+
+enum class g_io_stream_sign : uint8_t
+{
+	Positive,
+	Negative,
+	Space
+};
+
 struct g_io_stream
 {
-	int precision;
-	g_io_stream_mods mods;
-	g_io_stream_paramType type;
+	uint16_t precision;
+	uint16_t width;
+	uint8_t fillCharacter;
+	/* u8*/ g_io_stream_align alignment;
+	/*u16*/ g_io_stream_paramType type;
+	/*u32*/ g_io_stream_mods mods;
+	/* u8*/ g_io_stream_sign sign;
 
 	void parseModifiers(const char* modifiersStr, size_t length);
 	void resetModifiers();
@@ -202,10 +265,15 @@ GABE_CPP_PRINT_API void g_io_printf(const char* s, const T& value, const Args&..
 #ifdef GABE_CPP_PRINT_IMPL
 
 #include <cppUtils/cppStrings.hpp>
+#include <stdexcept>
 
 // -------------------- Common --------------------
 g_io_stream g_io_stream_stdout = {
 	0,
+	0,
+	' ',
+	g_io_stream_align::Left,
+	g_io_stream_paramType::None,
 	g_io_stream_mods::None
 };
 
@@ -218,12 +286,18 @@ static int32_t g_io_parseNextInteger(const char* str, size_t length, size_t* num
 	size_t cursor = 0;
 
 	// Keep parsing until we hit length or a non-integer-digit
-	while (cursor < length && g_io_isDigit(str[cursor]))
+	while (cursor < length&& g_io_isDigit(str[cursor]))
 	{
 		cursor++;
 	}
 
 	*numCharactersParsed = cursor;
+	if (cursor == 0)
+	{
+		// No digits parsed, this failed to parse a number so early exit to avoid
+		// buffer overflows in the next function
+		return 0;
+	}
 
 	int32_t multiplier = 1;
 	int32_t result = 0;
@@ -237,92 +311,220 @@ static int32_t g_io_parseNextInteger(const char* str, size_t length, size_t* num
 	return result;
 }
 
-void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
+static char g_io_stream_peek(size_t cursor, const char* str, size_t strLength)
 {
-	size_t cursor = 0;
-
-	// Parse '.' precision
-	if (modifiersStr[cursor] == '.')
+	if (cursor >= strLength)
 	{
-		this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::PrecisionSet);
-		cursor++;
+		return '\0';
 	}
 
-	// Parse precision digits
-	if (g_io_isDigit(modifiersStr[cursor]))
+	return str[cursor];
+}
+
+void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
+{
+	// format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
+	size_t cursor = 0;
+
+	// Parse [fill](":")
+	// Return early if end of string is reached with no specifiers
 	{
-		size_t numCharsParsed;
-		this->precision = g_io_parseNextInteger(modifiersStr + cursor, length - cursor, &numCharsParsed);
-		cursor += numCharsParsed;
+		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		if (c != ':' && c != '\0')
+		{
+			this->fillCharacter = g_io_stream_peek(cursor, modifiersStr, length);
+			cursor++;
+		}
+
+		c = g_io_stream_peek(cursor, modifiersStr, length);
+		if (c == ':')
+		{
+			// Consume ':' and move on to next parsing stage
+			cursor++;
+		}
+		else if (c == '\0')
+		{
+			// No format specified use default
+			return;
+		}
+		else
+		{
+			throw std::runtime_error("Malformed printf format specifier. Missing required ':'.");
+		}
+	}
+
+	// Parse [align]
+	{
+		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		switch (c)
+		{
+		case '<':
+			this->alignment = g_io_stream_align::Left;
+			cursor++;
+			break;
+		case '>':
+			this->alignment = g_io_stream_align::Right;
+			cursor++;
+			break;
+		case '^':
+			this->alignment = g_io_stream_align::Center;
+			cursor++;
+			break;
+		default:
+			break;
+		}
+	}
+
+	// Parse [sign]
+	{
+		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		switch (c)
+		{
+		case '+':
+			this->sign = g_io_stream_sign::Positive;
+			cursor++;
+			break;
+		case '-':
+			this->sign = g_io_stream_sign::Negative;
+			cursor++;
+			break;
+		case ' ':
+			this->sign = g_io_stream_sign::Space;
+			cursor++;
+			break;
+		default:
+			break;
+		}
+	}
+
+	// Parse ["#"] alt form shebang
+	{
+		if (g_io_stream_peek(cursor, modifiersStr, length) == '#')
+		{
+			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::AltFormat);
+			cursor++;
+		}
+	}
+
+	// Parse [width]
+	{
+		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		if (g_io_isDigit(c))
+		{
+			size_t numCharsParsed;
+			uint32_t parsedNumber = g_io_parseNextInteger(modifiersStr + cursor, length - cursor, &numCharsParsed);
+			if (parsedNumber >= UINT16_MAX)
+			{
+				throw std::runtime_error("Invalid format specification. Width can only be specified up to UINT16_MAX digits.");
+			}
+			this->width = (uint16_t)parsedNumber;
+			cursor += numCharsParsed;
+		}
+	}
+
+	// Parse ["." precision]
+	{
+		if (g_io_stream_peek(cursor, modifiersStr, length) == '.')
+		{
+			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::PrecisionSet);
+			cursor++;
+
+			// Parse precision digits
+			if (!g_io_isDigit(g_io_stream_peek(cursor, modifiersStr, length)))
+			{
+				throw std::runtime_error("Invalid format specification. \".\" must be followed by an integer to specify a precision width.");
+			}
+
+			size_t numCharsParsed;
+			int32_t parsedNumber = g_io_parseNextInteger(modifiersStr + cursor, length - cursor, &numCharsParsed);
+			if (parsedNumber >= UINT16_MAX)
+			{
+				throw std::runtime_error("Invalid format specification. Precision can only be up to UINT16_MAX digits in [\".\" precision] of format specifier.");
+			}
+			this->precision = (uint16_t)parsedNumber;
+			cursor += numCharsParsed;
+		}
 	}
 
 	// Parse type
-	switch (modifiersStr[cursor])
 	{
-	case 'b':
-	case 'B':
-		this->type = g_io_stream_paramType::Binary;
-		break;
-	case 'c':
-		this->type = g_io_stream_paramType::Character;
-		break;
-	case 'd':
-		this->type = g_io_stream_paramType::Decimal;
-		break;
-	case 'o':
-		this->type = g_io_stream_paramType::Octal;
-		break;
-	case 'x':
-	case 'X':
-		this->type = g_io_stream_paramType::Hexadecimal;
-		break;
-	case 'a':
-	case 'A':
-		this->type = g_io_stream_paramType::FloatHexadecimal;
-		break;
-	case 'e':
-	case 'E':
-		this->type = g_io_stream_paramType::ExponentNotation;
-		break;
-	case 'f':
-	case 'F':
-		this->type = g_io_stream_paramType::FixedPoint;
-		break;
-	case 'g':
-	case 'G':
-		this->type = g_io_stream_paramType::GeneralFormat;
-		break;
-	case 'p':
-		this->type = g_io_stream_paramType::Pointer;
-		break;
-	default:
-		break;
+		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		cursor++;
+		switch (c)
+		{
+		case 'b':
+		case 'B':
+			this->type = g_io_stream_paramType::Binary;
+			break;
+		case 'c':
+			this->type = g_io_stream_paramType::Character;
+			break;
+		case 'd':
+			this->type = g_io_stream_paramType::Decimal;
+			break;
+		case 'o':
+			this->type = g_io_stream_paramType::Octal;
+			break;
+		case 'x':
+		case 'X':
+			this->type = g_io_stream_paramType::Hexadecimal;
+			break;
+		case 'a':
+		case 'A':
+			this->type = g_io_stream_paramType::FloatHexadecimal;
+			break;
+		case 'e':
+		case 'E':
+			this->type = g_io_stream_paramType::ExponentNotation;
+			break;
+		case 'f':
+		case 'F':
+			this->type = g_io_stream_paramType::FixedPoint;
+			break;
+		case 'g':
+		case 'G':
+			this->type = g_io_stream_paramType::GeneralFormat;
+			break;
+		case 'p':
+			this->type = g_io_stream_paramType::Pointer;
+			break;
+		default:
+			break;
+		}
+
+		// Check if the modifier is capitalized
+		switch (c)
+		{
+		case 'F':
+		case 'A':
+		case 'E':
+		case 'G':
+		case 'B':
+		case 'X':
+			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::CapitalModifier);
+			break;
+		default:
+			break;
+		}
 	}
 
-	// Check if the modifier is capitalized
-	switch (modifiersStr[cursor])
+	// Make sure we finished parsing the whole thing, otherwise error out
+	if (cursor < length)
 	{
-	case 'F':
-	case 'A':
-	case 'E':
-	case 'G':
-	case 'B':
-	case 'X':
-		this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::CapitalModifier);
-		break;
-	default:
-		break;
+		throw std::runtime_error("Invalid format specifier. Expected end of format specifier \"}\" after [\"type\"], but string continued.");
 	}
 }
 
 void g_io_stream::resetModifiers()
 {
 	this->precision = 0;
+	this->width = 0;
+	this->fillCharacter = ' ';
 	this->mods = g_io_stream_mods::None;
 }
 
 template<typename T>
-static size_t integerToString(char* buffer, size_t bufferSize, T integer)
+static size_t integerToString(char* const buffer, size_t bufferSize, T integer)
 {
 	size_t numDigits = integer != 0
 		? (size_t)floor(log10((double)(integer < 0 ? -1 * integer : integer))) + 1 + (integer < 0 ? 1 : 0)
@@ -351,6 +553,74 @@ static size_t integerToString(char* buffer, size_t bufferSize, T integer)
 	}
 
 	return numDigits;
+}
+
+static char halfByteToHex(uint8_t halfByte, char baseA)
+{
+	const char* hexMap = "0123456789abcdef";
+	char hexDigit = hexMap[halfByte];
+	if (hexDigit >= 'a' && hexDigit <= 'f')
+	{
+		hexDigit = (hexDigit - 'a') + baseA;
+	}
+
+	return hexDigit;
+}
+
+static size_t integerToHexString(char* const buffer, size_t bufferSize, void* integer, size_t integerSize, bool useCapitalChars, bool addPrefix)
+{
+	char baseA = useCapitalChars ? 'A' : 'a';
+
+	char* bufferPtr = buffer;
+	char* bufferEnd = (char*)buffer + bufferSize;
+
+	// Add 0x prefix to the hex string if requested
+	if (addPrefix && bufferPtr <= bufferEnd)
+	{
+		*(bufferPtr++) = '0';
+		if (bufferPtr <= bufferEnd)
+		{
+			*(bufferPtr++) = baseA + ('x' - 'a');
+		}
+	}
+
+	// Convert binary number to hex
+	uint8_t* bytePtr = (uint8_t*)(integer)+(integerSize - 1);
+	while (bytePtr >= (uint8_t*)integer && bufferPtr <= bufferEnd)
+	{
+		// TODO: Maybe we should have compile-time macros that switch this up
+		//       depending on what the target platform architecture is
+		// Assume machine is little-endian and print big-endian style
+		*(bufferPtr++) = halfByteToHex((*bytePtr >> 4) & 0xF, baseA);
+
+		if (bufferPtr <= bufferEnd)
+		{
+			*(bufferPtr++) = halfByteToHex(*bytePtr & 0xF, baseA);
+		}
+
+		bytePtr--;
+	}
+
+	return (bufferPtr - buffer);
+}
+
+template<typename T>
+static size_t integerToString(char* const buffer, size_t bufferSize, T integer, g_io_stream& io)
+{
+	switch (io.type)
+	{
+	case g_io_stream_paramType::None: // Default to decimal display
+		// TODO: Should we throw a runtime error here or does it really matter?
+	case g_io_stream_paramType::FixedPoint: // Treat any floating point modifiers as the default state as well
+	case g_io_stream_paramType::Decimal:
+		return integerToString(buffer, bufferSize, integer);
+	case g_io_stream_paramType::Hexadecimal:
+		return integerToHexString(buffer, bufferSize, &integer, sizeof(T),
+			(uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier,
+			(uint32_t)io.mods & (uint32_t)g_io_stream_mods::AltFormat);
+	}
+
+	throw std::runtime_error("Unknown io stream modifier in integerToString used.");
 }
 
 static size_t realNumberToString(double const& number, char* const buffer, size_t bufferSize, int numDigitsAfterDecimal, int expCutoff)
@@ -453,7 +723,7 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 		double weight = pow(10.0, (double)magnitude);
 		int digit = (int)floor(n / weight);
 		n -= (digit * weight);
-		
+
 		*(bufferPtr++) = (char)('0' + digit);
 		if (passedDecimal)
 		{
@@ -483,7 +753,7 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 			int oldNumber = g_io_toNumber(buffer[i]);
 			int newNumber = oldNumber + carry;
 			bool shouldBreak = oldNumber < 5;
-			if (newNumber >= 10) 
+			if (newNumber >= 10)
 			{
 				carry = newNumber - 9;
 				newNumber = newNumber % 10;
@@ -525,7 +795,7 @@ g_io_stream& operator<<(g_io_stream& io, float const& number)
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, double const& number) 
+g_io_stream& operator<<(g_io_stream& io, double const& number)
 {
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
@@ -539,7 +809,7 @@ g_io_stream& operator<<(g_io_stream& io, int8_t const& integer)
 {
 	constexpr size_t bufferSize = 4;
 	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer, io);
 	_g_io_printf_internal(buffer, length);
 	return io;
 }
@@ -549,7 +819,7 @@ g_io_stream& operator<<(g_io_stream& io, int16_t const& integer)
 {
 	constexpr size_t bufferSize = 6;
 	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer, io);
 	_g_io_printf_internal(buffer, length);
 	return io;
 }
@@ -559,7 +829,7 @@ g_io_stream& operator<<(g_io_stream& io, int32_t const& integer)
 {
 	constexpr size_t bufferSize = 11;
 	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer, io);
 	_g_io_printf_internal(buffer, length);
 	return io;
 }
@@ -569,7 +839,7 @@ g_io_stream& operator<<(g_io_stream& io, int64_t const& integer)
 {
 	constexpr size_t bufferSize = 20;
 	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer, io);
 	_g_io_printf_internal(buffer, length);
 	return io;
 }
@@ -579,7 +849,7 @@ g_io_stream& operator<<(g_io_stream& io, uint8_t const& integer)
 {
 	constexpr size_t bufferSize = 4;
 	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer, io);
 	_g_io_printf_internal(buffer, length);
 	return io;
 }
@@ -589,7 +859,7 @@ g_io_stream& operator<<(g_io_stream& io, uint16_t const& integer)
 {
 	constexpr size_t bufferSize = 6;
 	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer, io);
 	_g_io_printf_internal(buffer, length);
 	return io;
 }
@@ -599,7 +869,7 @@ g_io_stream& operator<<(g_io_stream& io, uint32_t const& integer)
 {
 	constexpr size_t bufferSize = 11;
 	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer, io);
 	_g_io_printf_internal(buffer, length);
 	return io;
 }
@@ -609,7 +879,7 @@ g_io_stream& operator<<(g_io_stream& io, uint64_t const& integer)
 {
 	constexpr size_t bufferSize = 21;
 	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer);
+	size_t length = integerToString(buffer, bufferSize, integer, io);
 	_g_io_printf_internal(buffer, length);
 	return io;
 }
@@ -646,7 +916,6 @@ g_io_stream& operator<<(g_io_stream& io, std::string const& str)
 #ifdef _WIN32
 
 #include <Windows.h>
-#include <stdexcept>
 
 static HANDLE stdoutHandle = NULL;
 
