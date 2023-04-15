@@ -38,7 +38,7 @@ struct Vec2
 	float y;
 };
 
-g_cppPrint_io& operator<<(g_cppPrint_io& io, const Vec2& vec)
+g_io_stream& operator<<(g_io_stream& io, const Vec2& vec)
 {
 	io << "{ " << vec.x << ", " << vec.y << " }";
 	return io;
@@ -141,21 +141,21 @@ int main()
 		);
 
 		g_logger_info("Testing some floats:\n"
-			" INFINITE: {}\n"
-			"-INFINITE: {}\n"
-			"      NAN: {}\n"
-			"     0.32: {}\n"
-			"  1.22223: {}\n"
-			" 1.999999: {}\n"
-			"      2.0: {}\n"
-			"  2.00001: {}\n"
-			"      0.0: {}\n"
-			"  1.25e10: {}\n",
+			"  INFINITE: {}\n"
+			" -INFINITE: {}\n"
+			"       NAN: {}\n"
+			"      0.32: {.3f}\n"
+			" 1.2222239f: {}\n"
+			"  1.999999: {}\n"
+			"       2.0: {}\n"
+			"   2.00001: {}\n"
+			"       0.0: {}\n"
+			"   1.25e10: {}\n",
 			(float)INFINITY,
 			-1.0f * (float)INFINITY,
 			NAN,
 			0.32f,
-			1.22223f,
+			1.2222239f,
 			1.999999f,
 			2.0f,
 			2.00001f,
@@ -163,7 +163,8 @@ int main()
 			1.25e10f
 		);
 
-		g_logger_info("Vec2: {}", vec2);
+		g_io_stream_stdout << vec2;
+		g_logger_info("Vec2: {{ hello {{ there {{ {.3f} continue on printing", vec2);
 	}
 
 	g_memory_dumpMemoryLeaks();
