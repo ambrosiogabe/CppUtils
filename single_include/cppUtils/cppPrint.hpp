@@ -91,6 +91,8 @@ using g_io_sizedCharArray = char[N];
 template<>
 g_io_stream& operator<<(g_io_stream& io, float const& number);
 template<>
+g_io_stream& operator<<(g_io_stream& io, double const& number);
+template<>
 g_io_stream& operator<<(g_io_stream& io, int8_t const& integer);
 template<>
 g_io_stream& operator<<(g_io_stream& io, int16_t const& integer);
@@ -323,7 +325,7 @@ template<typename T>
 static size_t integerToString(char* buffer, size_t bufferSize, T integer)
 {
 	size_t numDigits = integer != 0
-		? (size_t)floor(log10((double)(integer < 0 ? -1 * integer : integer)) + 1.0) + (integer < 0 ? 1 : 0)
+		? (size_t)floor(log10((double)(integer < 0 ? -1 * integer : integer))) + 1 + (integer < 0 ? 1 : 0)
 		: 1;
 	if (numDigits > bufferSize)
 	{
@@ -351,11 +353,8 @@ static size_t integerToString(char* buffer, size_t bufferSize, T integer)
 	return numDigits;
 }
 
-template<typename T>
-static size_t realNumberToString(T const& number, char* const buffer, size_t bufferSize, int numDigitsAfterDecimal, int expCutoff)
+static size_t realNumberToString(double const& number, char* const buffer, size_t bufferSize, int numDigitsAfterDecimal, int expCutoff)
 {
-	static_assert(std::is_floating_point<T>(), "printRealNumber only works with floating point digits.");
-
 	// Handle special cases
 	if (isinf(number))
 	{
@@ -397,8 +396,9 @@ static size_t realNumberToString(T const& number, char* const buffer, size_t buf
 
 		return 0;
 	}
-	else if (number == (T)0.0f)
+	else if (number == 0.0)
 	{
+		// TODO: Print the appropriate number of 0's after mantissa for formatted strings
 		if (bufferSize >= sizeof("0.0"))
 		{
 			char* bufferPtr = buffer;
@@ -414,18 +414,24 @@ static size_t realNumberToString(T const& number, char* const buffer, size_t buf
 	char* bufferPtr = &buffer[0];
 	char* bufferEnd = bufferPtr + bufferSize;
 
-	bool isNegative = number < (T)0.0f;
+	bool isNegative = number < 0.0;
 	double n = isNegative ? -1.0 * (double)number : (double)number;
 
 	// Calculate magnitude
 	int magnitude = (int)log10(n);
 
-	bool useExp = magnitude > expCutoff;
+	bool useExp = magnitude > expCutoff || magnitude < -expCutoff;
+	bool expSignIsPositive = magnitude > 0;
 	int expNumber = 0;
 	if (useExp)
 	{
 		double weight = pow(10.0, (double)magnitude);
 		n = n / weight;
+		if (n < 1.0 && n > -1.0)
+		{
+			n *= 10;
+			magnitude--;
+		}
 		expNumber = magnitude;
 		magnitude = 0;
 	}
@@ -435,17 +441,14 @@ static size_t realNumberToString(T const& number, char* const buffer, size_t buf
 		*(bufferPtr++) = '-';
 	}
 
-	bool usePrecision = false;
-	float precision = 0.000001f;
 	if (numDigitsAfterDecimal == 0)
 	{
-		usePrecision = true;
+		numDigitsAfterDecimal = 6;
 	}
 
 	int parsedNumDigitsAfterDecimal = 0;
 	bool passedDecimal = false;
-	while (((!usePrecision && parsedNumDigitsAfterDecimal < numDigitsAfterDecimal) || (usePrecision && n >= 0.0 + precision))
-		&& buffer != bufferEnd)
+	while (parsedNumDigitsAfterDecimal <= numDigitsAfterDecimal && buffer != bufferEnd)
 	{
 		double weight = pow(10.0, (double)magnitude);
 		int digit = (int)floor(n / weight);
@@ -461,29 +464,25 @@ static size_t realNumberToString(T const& number, char* const buffer, size_t buf
 		{
 			*(bufferPtr++) = '.';
 			passedDecimal = true;
-			if (usePrecision && buffer != bufferEnd && n < 0.0 + (double)precision)
-			{
-				// Add trailing 0 if it would otherwise end in a decimal.
-				// So, change 2. -> 2.0
-				*(bufferPtr++) = '0';
-			}
 		}
 		magnitude--;
 	}
 
+	// Round if needed
 	if (passedDecimal && g_io_isDigit(*(bufferPtr - 1)) && g_io_toNumber(*(bufferPtr - 1)) >= 5)
 	{
 		// Round all digits up by 1 until we can't
 		int carry = 1;
-		for (size_t i = bufferPtr - buffer - 1; i > 0; i--)
+		for (int i = (int)(bufferPtr - buffer - 2); i >= 0; i--)
 		{
 			if (buffer[i] == '.')
 			{
 				continue;
 			}
 
-			int newNumber = g_io_toNumber(buffer[i]) + carry;
-			bool shouldBreak = newNumber < 5;
+			int oldNumber = g_io_toNumber(buffer[i]);
+			int newNumber = oldNumber + carry;
+			bool shouldBreak = oldNumber < 5;
 			if (newNumber >= 10) 
 			{
 				carry = newNumber - 9;
@@ -499,10 +498,16 @@ static size_t realNumberToString(T const& number, char* const buffer, size_t buf
 		}
 	}
 
+	// After rounding, remove 1 digit of precision, since we added an extra digit of precision
+	// just for rounding purposes
+	bufferPtr--;
+
 	if (useExp && buffer != bufferEnd)
 	{
 		*(bufferPtr++) = 'e';
-		bufferPtr += integerToString(bufferPtr, bufferEnd - bufferPtr, expNumber);
+		*(bufferPtr++) = expSignIsPositive ? '+' : '-';
+		int numToPrint = expNumber < 0 ? expNumber * -1 : expNumber;
+		bufferPtr += integerToString(bufferPtr, bufferEnd - bufferPtr, numToPrint);
 	}
 
 	return (bufferPtr - buffer);
@@ -512,7 +517,17 @@ static size_t realNumberToString(T const& number, char* const buffer, size_t buf
 template<>
 g_io_stream& operator<<(g_io_stream& io, float const& number)
 {
-	constexpr size_t bufferSize = 256;
+	constexpr size_t bufferSize = 128;
+	char buffer[bufferSize];
+	size_t length = realNumberToString((double)number, buffer, bufferSize, io.precision, 5);
+	_g_io_printf_internal(buffer, length);
+	return io;
+}
+
+template<>
+g_io_stream& operator<<(g_io_stream& io, double const& number) 
+{
+	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
 	size_t length = realNumberToString(number, buffer, bufferSize, io.precision, 5);
 	_g_io_printf_internal(buffer, length);
@@ -562,7 +577,7 @@ g_io_stream& operator<<(g_io_stream& io, int64_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, uint8_t const& integer)
 {
-	constexpr size_t bufferSize = 3;
+	constexpr size_t bufferSize = 4;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer);
 	_g_io_printf_internal(buffer, length);
@@ -572,7 +587,7 @@ g_io_stream& operator<<(g_io_stream& io, uint8_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, uint16_t const& integer)
 {
-	constexpr size_t bufferSize = 5;
+	constexpr size_t bufferSize = 6;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer);
 	_g_io_printf_internal(buffer, length);
@@ -582,7 +597,7 @@ g_io_stream& operator<<(g_io_stream& io, uint16_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, uint32_t const& integer)
 {
-	constexpr size_t bufferSize = 10;
+	constexpr size_t bufferSize = 11;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer);
 	_g_io_printf_internal(buffer, length);
@@ -592,8 +607,7 @@ g_io_stream& operator<<(g_io_stream& io, uint32_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, uint64_t const& integer)
 {
-	UINT64_MAX;
-	constexpr size_t bufferSize = 20;
+	constexpr size_t bufferSize = 21;
 	char buffer[bufferSize];
 	size_t length = integerToString(buffer, bufferSize, integer);
 	_g_io_printf_internal(buffer, length);

@@ -38,6 +38,19 @@ struct Vec2
 	float y;
 };
 
+struct UnknownStruct
+{
+	float foo;
+	int bar;
+	const char* string;
+};
+
+g_io_stream& operator<<(g_io_stream& io, const UnknownStruct& foo)
+{
+	io << "<Foo: " << foo.foo << ", bar: " << foo.bar << ", string: " << foo.string << ">";
+	return io;
+}
+
 g_io_stream& operator<<(g_io_stream& io, const Vec2& vec)
 {
 	io << "{ " << vec.x << ", " << vec.y << " }";
@@ -141,16 +154,18 @@ int main()
 		);
 
 		g_logger_info("Testing some floats:\n"
-			"  INFINITE: {}\n"
-			" -INFINITE: {}\n"
-			"       NAN: {}\n"
-			"      0.32: {.3f}\n"
+			"   INFINITE: {}\n"
+			"  -INFINITE: {}\n"
+			"        NAN: {}\n"
+			"       0.32: {.9f}\n"
 			" 1.2222239f: {}\n"
-			"  1.999999: {}\n"
-			"       2.0: {}\n"
-			"   2.00001: {}\n"
-			"       0.0: {}\n"
-			"   1.25e10: {}\n",
+			"   1.999999: {.3f}\n"
+			"        2.0: {}\n"
+			"    2.00001: {}\n"
+			"        0.0: {}\n"
+			"    1.25e10: {}\n"
+			"0.999999999: {}\n"
+			"   1.25e-10: {}",
 			(float)INFINITY,
 			-1.0f * (float)INFINITY,
 			NAN,
@@ -160,11 +175,25 @@ int main()
 			2.0f,
 			2.00001f,
 			0.0f,
-			1.25e10f
+			1.25e10f,
+			0.999999999f,
+			1.25e-10
 		);
+
+		g_logger_info("{}", 1.2222239f);
 
 		g_io_stream_stdout << vec2;
 		g_logger_info("Vec2: {{ hello {{ there {{ {.3f} continue on printing", vec2);
+
+		UnknownStruct unknown = {
+			2.75f,
+			-280,
+			"Hello sailor!"
+		};
+		g_logger_info("Hey this is unknown: {}", unknown);
+
+		const char* actualPtr = "Actually a ptr.";
+		g_logger_info("Hey here's a raw string literal: {} {}", "Raw string literal", actualPtr);
 	}
 
 	g_memory_dumpMemoryLeaks();
