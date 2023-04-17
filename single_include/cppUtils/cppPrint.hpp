@@ -1,4 +1,5 @@
 /*
+ -------- QUICK_START --------
  Do this:
 	 #define GABE_CPP_PRINT_IMPL
  before you include this file in *one* C++ file to create the implementation.
@@ -7,6 +8,25 @@
  #define GABE_CPP_PRINT_IMPL
  #include "cppPrint.hpp"
 
+ -------- QUICK_START + cppUtils.hpp --------
+ To use this library in conjunction with cppUtils.hpp, make sure any #include<cppUtils/cppUtils.hpp> are formatted like:
+
+ #define USE_GABE_CPP_PRINT
+ #include <cppUtils/cppUtils.hpp>
+ #undef USE_GABE_CPP_PRINT
+
+ And in your single implementation file, make sure it's formatted like:
+
+ #define GABE_CPP_PRINT_IMPL
+ #include <cppUtils/cppPrint.hpp>
+ #undef GABE_CPP_PRINT_IMPL
+
+ #define GABE_CPP_UTILS_IMPL
+ #include <cppUtils/cppUtils.hpp>
+
+ This will ensure that all calls to g_logger_* will use this print library, allowing you to make print statements
+ like `g_logger_info("{:.2f}", 3.1416f)`.
+
 
 
  -------- LICENSE --------
@@ -14,17 +34,12 @@
  Open Source, see end of file
 
 
-
  -------- DOCUMENTATION --------
 
  Format specification (adapted from https://fmt.dev/latest/syntax.html)
 
- Any fields marked with [] are optional, whereas fields marked with () are
- required.
-
- If no format is specified, e.g you specify something like print("{}"),
- then it will use all the default options.
-
+ Any fields marked with [] are optional, whereas fields marked with () are required. If no format is specified, 
+ for example if you specify something like print("{}"), then it will use all the default options.
 
    format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
    fill        ::= <any ASCII character other than "{" | "}" | ":">
@@ -35,44 +50,73 @@
    type        ::= "a" | "A" | "b" | "B" | "c" | "d" | "e" | "E" | "f" | "F" |"g" | "G" |
 				   "o" | "p" | "s" | "x" | "X"
 
-
-   "#": Alternate form. This will display a prefix of 0b for binary, 0x for hex, and 0c for octal.
-
-   ":" Required separator
-
-   ".": Required separator when specifying precision.
-
-   fill: Specifies what kind of character to fill any padded space with. Default ' '
-
-   align: Specifies alignment of content
-		  "<" is Left-align
-		  ">" is right-align
-		  "^" is centered
-
-   sign: "+" Means always display + or - sign for numeric content. Default "-"
-		 " " Means display - for negative numbers, and a padded space for positive numbers
-		 "-" Means only display - for negative numbers and do nothing for positive numbers
-		 "+" = "+3.12" "-3.12"
-		 " " = " 3.12" "-3.12"
-		 "-" = "3.12" "-3.12"
-  width: Minimum width for content to fill. Max width that can be used is UINT16_MAX.
-
+        "#": Alternate form. This will display a prefix of 0b for binary, 0x for hex, and 0c for octal.
+        ":": Required separator
+        ".": Required separator when specifying precision.
+       fill: Specifies what kind of character to fill any padded space with. Default ' '
+      align: Specifies alignment of content
+		     "<" is Left-align
+		     ">" is right-align
+		     "^" is centered
+       sign: "+" Means always display + or - sign for numeric content. Default "-"
+	  	     " " Means display - for negative numbers, and a padded space for positive numbers
+	  	     "-" Means only display - for negative numbers and do nothing for positive numbers
+	  	     "+" = "+3.12" "-3.12"
+	  	     " " = " 3.12" "-3.12"
+	  	     "-" = "3.12" "-3.12"
+      width: Minimum width for content to fill. Max width that can be used is UINT16_MAX.
   precision: Number of digits to show after decimal place. Defaults to 6. If the number is truncated
 			 it will be rounded to the next natural decimal place, e.g 4.9999999 -> 5.000000 for precision
 			 of 6. Max precision that can be used is UINT16_MAX.
+       type: This specifies the output format for any integral data you want to print. There are variations of the
+             types based on whether the data is floating point or integral or a pointer.
+			 
+			 Integer flags:
+			 -------------
+			 default: 'd'
+		     'b': Binary format. Outputs the number in base 2 with an apostrophe every 4 bits for clarity (e.g
+		          1111'1010). Using the "#" will add the prefix "0b".
+		     'B': Same as above, except the prefix will use "0B".
+		     'c': Character format. Will output the number as an ASCII character.
+		     'd': Decimal integer. Outputs the number in base 10. This is the default.
+			 'o': Octal format. Outputs the number in base 8. Using the "#" will add the prefix "0c".
+			 'O': Same as above, except the prefix is "0C".
+			 'x': Hex format. Outputs the number in base 16 using lower-case letters 'a'-'f'. Using the
+			      "#" will add the prefix "0x".
+		     'X': Same as above, except it will use upper-case letters 'A'-'F', and using "#" will add the prefix "0X".
 
-  type: TODO: Fill this info out
+			 Integer flags:
+			 -------------
+			 default: 'f' with a precision of 6
+			 'a': Hexadecimal floating point format. Prints the number in base 16 with lower-case letters 'a'-'f'.
+			      Using "#" will prefix "0x". Uses "p" to denote the exponent.
+			 'A': Same as above, except uses upper-case letters 'A'-'F' and using "#" will add the prefix "0X" and
+			      "P" will denote the exponent.
+			 'e': Exponent notation. Prints the number in scientific notation using the letter 'e' to denote the exponent.
+			 'E': Same as above, except uses the letter 'E'.
+			 'f': Fixed point. Displays the number as a fixed point number.
+			 'F': Fixed point. Except nan is converted to NAN, and inf is converted to INF.
 
+			 Pointer flags:
+			 -------------
+			 default: 'p'
+			 'p': Pointer format. This is the default type for pointers. Prints the pointer address in hexadecimal notation
+			      using 4 bytes, or 8 bytes on a 32 bit or 64 bit computer respectively.
 
  -------- DLL STUFF --------
 
- If you want to use this library as part of a DLL, I have created a macro:
+ Because of the nature of this library and the amount of templated functions, I would not recommend using this library
+ as a DLL or shared library. Instead, statically linking this library is recommended by compiling the code directly
+ in your codebase.
+
+ If really must use this library as part of a DLL, I have created a macro:
 
 	GABE_CPP_PRINT_API
 
  that does nothing, but prefaces each forward declaration. Simply redefine this
  to your preferred __declspec(dllimport) or __declspec(dllexport) before including this
- file anywhere and it should just work out.
+ file anywhere and it should just work out. No guarantees are made for ABI stability.
+
 */
 #ifndef GABE_CPP_PRINT_H
 #define GABE_CPP_PRINT_H
