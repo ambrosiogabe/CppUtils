@@ -1,4 +1,4 @@
-// ===================================================================================
+﻿// ===================================================================================
 // Test main
 // This is just a testing workspace for me while developing this
 // do not define GABE_CPP_UTILS_TEST_MAIN unless you are developing 
@@ -212,13 +212,22 @@ void mainFunc()
 			123);
 
 		g_logger_info("\n"
-			"+{-:^20}+\n"
-			"|{ :^20}|\n"
-			"+{-:^20}+",
+			u8"┌{-:^20}┐\n"
+			u8"|{ :^20}|\n"
+			u8"└{-:^20}┘",
 			"",
 			"Hello World!",
 			""
 		);
+
+		g_logger_info(u8"Test some unicode strings\n"
+			u8"     checkmark: \u2713 \n"
+			u8"        x-mark: \u2a2f \n"
+		    u8"       o-slash: \u00D8 \n"
+		    u8"      small-xi: \u03be \n"
+		    u8"     small-phi: \u03C6 \n"
+		    u8"special-quotes: \u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B \n"
+		    u8"        arrows: \u2192 \u2190 \u2191 \u2193 \u2194 \u2195");
 	}
 
 	g_memory_dumpMemoryLeaks();

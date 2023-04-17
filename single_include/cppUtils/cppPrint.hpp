@@ -36,9 +36,9 @@
 
  -------- DOCUMENTATION --------
 
- Format specification (adapted from https://fmt.dev/latest/syntax.html)
+ Format specification: (adapted from https://fmt.dev/latest/syntax.html)
 
- Any fields marked with [] are optional, whereas fields marked with () are required. If no format is specified, 
+ Any fields marked with [] are optional, whereas fields marked with () are required. If no format is specified,
  for example if you specify something like print("{}"), then it will use all the default options.
 
    format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
@@ -50,48 +50,49 @@
    type        ::= "a" | "A" | "b" | "B" | "c" | "d" | "e" | "E" | "f" | "F" |"g" | "G" |
 				   "o" | "p" | "s" | "x" | "X"
 
-        "#": Alternate form. This will display a prefix of 0b for binary, 0x for hex, and 0c for octal.
-        ":": Required separator
-        ".": Required separator when specifying precision.
-       fill: Specifies what kind of character to fill any padded space with. Default ' '
-      align: Specifies alignment of content
-		     "<" is Left-align
-		     ">" is right-align
-		     "^" is centered
-       sign: "+" Means always display + or - sign for numeric content. Default "-"
-	  	     " " Means display - for negative numbers, and a padded space for positive numbers
-	  	     "-" Means only display - for negative numbers and do nothing for positive numbers
-	  	     "+" = "+3.12" "-3.12"
-	  	     " " = " 3.12" "-3.12"
-	  	     "-" = "3.12" "-3.12"
-      width: Minimum width for content to fill. Max width that can be used is UINT16_MAX.
+		"#": Alternate form. This will display a prefix of 0b for binary, 0x for hex, and 0c for octal.
+		":": Required separator
+		".": Required separator when specifying precision.
+	   fill: Specifies what kind of character to fill any padded space with. Default ' '
+	  align: Specifies alignment of content
+			 "<" is Left-align
+			 ">" is right-align
+			 "^" is centered
+	   sign: "+" Means always display + or - sign for numeric content. Default "-"
+			 " " Means display - for negative numbers, and a padded space for positive numbers
+			 "-" Means only display - for negative numbers and do nothing for positive numbers
+			 Examples:
+			   "+" = "+3.12" "-3.12"
+			   " " = " 3.12" "-3.12"
+			   "-" = "3.12" "-3.12"
+	  width: Minimum width for content to fill. Max width that can be used is UINT16_MAX.
   precision: Number of digits to show after decimal place. Defaults to 6. If the number is truncated
-			 it will be rounded to the next natural decimal place, e.g 4.9999999 -> 5.000000 for precision
-			 of 6. Max precision that can be used is UINT16_MAX.
-       type: This specifies the output format for any integral data you want to print. There are variations of the
-             types based on whether the data is floating point or integral or a pointer.
-			 
+			 it will be rounded to the next natural decimal place, for example 4.9999999 -> 5.000000
+			 for a precision of 6. Max precision that can be used is UINT16_MAX.
+	   type: This specifies the output format for any integral data you want to print. There are variations
+			 of the types based on whether the data is floating point, integral,  or a pointer.
+
 			 Integer flags:
 			 -------------
 			 default: 'd'
-		     'b': Binary format. Outputs the number in base 2 with an apostrophe every 4 bits for clarity (e.g
-		          1111'1010). Using the "#" will add the prefix "0b".
-		     'B': Same as above, except the prefix will use "0B".
-		     'c': Character format. Will output the number as an ASCII character.
-		     'd': Decimal integer. Outputs the number in base 10. This is the default.
+			 'b': Binary format. Outputs the number in base 2 with an apostrophe every 4 bits for clarity (e.g
+				  1111'1010). Using the "#" will add the prefix "0b".
+			 'B': Same as above, except the prefix will use "0B".
+			 'c': Character format. Will output the number as an ASCII character.
+			 'd': Decimal integer. Outputs the number in base 10. This is the default.
 			 'o': Octal format. Outputs the number in base 8. Using the "#" will add the prefix "0c".
 			 'O': Same as above, except the prefix is "0C".
 			 'x': Hex format. Outputs the number in base 16 using lower-case letters 'a'-'f'. Using the
-			      "#" will add the prefix "0x".
-		     'X': Same as above, except it will use upper-case letters 'A'-'F', and using "#" will add the prefix "0X".
+				  "#" will add the prefix "0x".
+			 'X': Same as above, except it will use upper-case letters 'A'-'F', and using "#" will add the prefix "0X".
 
 			 Integer flags:
 			 -------------
 			 default: 'f' with a precision of 6
 			 'a': Hexadecimal floating point format. Prints the number in base 16 with lower-case letters 'a'-'f'.
-			      Using "#" will prefix "0x". Uses "p" to denote the exponent.
+				  Using "#" will prefix "0x". Uses "p" to denote the exponent.
 			 'A': Same as above, except uses upper-case letters 'A'-'F' and using "#" will add the prefix "0X" and
-			      "P" will denote the exponent.
+				  "P" will denote the exponent.
 			 'e': Exponent notation. Prints the number in scientific notation using the letter 'e' to denote the exponent.
 			 'E': Same as above, except uses the letter 'E'.
 			 'f': Fixed point. Displays the number as a fixed point number.
@@ -101,7 +102,7 @@
 			 -------------
 			 default: 'p'
 			 'p': Pointer format. This is the default type for pointers. Prints the pointer address in hexadecimal notation
-			      using 4 bytes, or 8 bytes on a 32 bit or 64 bit computer respectively.
+				  using 4 bytes, or 8 bytes on a 32 bit or 64 bit computer respectively.
 
  -------- DLL STUFF --------
 
@@ -679,7 +680,7 @@ static size_t dataToBinaryString(char* const buffer, size_t bufferSize, void* da
 		// Skip leading 0's
 		if (!mostSignificantBitHit)
 		{
-			if (*bytePtr == 0) 
+			if (*bytePtr == 0)
 			{
 				bytePtr--;
 				continue;
@@ -740,7 +741,7 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 {
 	switch (io.type)
 	{
-	// Default to fixed point
+		// Default to fixed point
 	case g_io_stream_paramType::None:
 	case g_io_stream_paramType::FixedPoint:
 		break;
@@ -1198,6 +1199,13 @@ static size_t _g_io_get_float_prefix_size(const g_io_stream& io)
 #include <Windows.h>
 
 static HANDLE stdoutHandle = NULL;
+static bool writingDirectlyToConsole = false;
+static constexpr int fontExistCode = 3;
+
+int CALLBACK win32FontExistsCallback(const LOGFONTW*, const TEXTMETRICW*, DWORD, LPARAM)
+{
+	return fontExistCode;
+}
 
 static void initializeStdoutIfNecessary()
 {
@@ -1213,6 +1221,63 @@ static void initializeStdoutIfNecessary()
 			// Running on a device with no dedicated stdout, just pipe the output nowhere in this case
 			throw std::runtime_error("Cannot acquire a STD_OUTPUT_HANDLE. Current device does not support stdout.");
 		}
+
+		// Are we printing to the console or redirecting through a pipe?
+		DWORD _mode;
+		BOOL consoleModeRes = GetConsoleMode(stdoutHandle, &_mode);
+		writingDirectlyToConsole = consoleModeRes != 0;
+
+		if (writingDirectlyToConsole)
+		{
+			DWORD nfont = 0;
+			COORD fontSize = GetConsoleFontSize(stdoutHandle, nfont);
+
+			CONSOLE_FONT_INFOEX cfi;
+			cfi.cbSize = sizeof(cfi);
+			cfi.nFont = nfont;
+			cfi.dwFontSize.X = fontSize.X;
+			cfi.dwFontSize.Y = fontSize.Y;
+			cfi.FontWeight = 400;
+			cfi.FontFamily = TMPF_TRUETYPE;
+			cfi.FontWeight = FW_NORMAL;
+
+			// Try a few fonts in order of the best font for UTF8 to the worst font to use
+			// if all tries fail, then the console will use the default console font which
+			// will probably fail for unicode stuff.
+			constexpr size_t maxFallbackFonts = 5;
+			size_t fallbackIndex = 0;
+			constexpr wchar_t* fontsToTry[maxFallbackFonts] = {
+				L"Cascadia Mono",
+				L"Cascadia Code",
+				L"Consolas",
+				L"NSimSun"
+			};
+
+			HDC hdc = GetDC(NULL);
+			LOGFONTW logFont;
+			memset(&logFont, 0, sizeof(LOGFONT));
+			wcscpy_s(logFont.lfFaceName, fontsToTry[fallbackIndex++]);
+			bool fontExists = EnumFontFamiliesExW(hdc, &logFont, win32FontExistsCallback, NULL, NULL) == fontExistCode;
+
+			while (!fontExists && fallbackIndex < maxFallbackFonts)
+			{
+				wcscpy_s(logFont.lfFaceName, fontsToTry[fallbackIndex++]);
+				fontExists = EnumFontFamiliesExW(hdc, &logFont, win32FontExistsCallback, NULL, NULL) == fontExistCode;
+			}
+
+			if (fontExists)
+			{
+				wcscpy_s(cfi.FaceName, fontsToTry[fallbackIndex - 1]);
+				BOOL res = SetCurrentConsoleFontEx(stdoutHandle, FALSE, &cfi);
+				if (!res)
+				{
+					throw std::runtime_error("Failed to find suitable font for console.");
+				}
+			}
+		}
+
+		// TODO: If we're not writing directly to console then check if the file we are writing to is
+		//       new. If it is new, then write the BOM prefix for the file to specify this is UTF-8.
 	}
 }
 
@@ -1226,9 +1291,22 @@ void _g_io_printf_internal(const char* s, size_t length)
 	initializeStdoutIfNecessary();
 	if (length <= MAXDWORD)
 	{
-		DWORD numBytesWritten;
-		WriteFile(stdoutHandle, s, (DWORD)length, &numBytesWritten, NULL);
-		if (numBytesWritten != length)
+		DWORD numCharsInString = (DWORD)length;
+		DWORD numCharsWritten;
+		if (!writingDirectlyToConsole)
+		{
+			WriteFile(stdoutHandle, s, (DWORD)length, &numCharsWritten, NULL);
+		}
+		else
+		{
+			numCharsInString = MultiByteToWideChar(CP_UTF8, NULL, s, (int)length, NULL, 0);
+			WCHAR* utf16String = (WCHAR*)malloc(sizeof(WCHAR) * numCharsInString);
+			MultiByteToWideChar(CP_UTF8, NULL, s, (int)length, utf16String, numCharsInString);
+			WriteConsoleW(stdoutHandle, utf16String, numCharsInString, &numCharsWritten, NULL);
+			free(utf16String);
+		}
+
+		if (numCharsWritten != numCharsInString)
 		{
 			throw std::runtime_error("Failed to write to stdout. OOM or something idk.");
 		}
@@ -1258,7 +1336,7 @@ void _g_io_printf_internal(const char* s, size_t length)
 		std::string errorMessage = "String length is invalid '" + std::to_string(length) + "'. Must be >= 0 && <= " + std::to_string(INT32_MAX);
 		throw new std::runtime_error(errorMessage.c_str());
 	}
-		}
+}
 
 #endif // end PLATFORM_IMPLS
 
