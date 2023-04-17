@@ -279,6 +279,9 @@ g_io_stream g_io_stream_stdout = {
 	g_io_stream_mods::None
 };
 
+// NOTE: Big enough to hold 64 bits (for binary representation) plus an apostrophe every 4 bits (for clarity in reading)
+static constexpr size_t maxIntegerBufferSize = 81;
+
 // ------ Internal functions ------
 static void _g_io_print_string_formatted(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const g_io_stream& io);
 static const char* _g_io_get_int_prefix(const g_io_stream& io);
@@ -294,7 +297,7 @@ static int32_t g_io_parseNextInteger(const char* str, size_t length, size_t* num
 	size_t cursor = 0;
 
 	// Keep parsing until we hit length or a non-integer-digit
-	while (cursor < length&& g_io_isDigit(str[cursor]))
+	while (cursor < length && g_io_isDigit(str[cursor]))
 	{
 		cursor++;
 	}
@@ -458,6 +461,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 	{
 		char c = g_io_stream_peek(cursor, modifiersStr, length);
 		cursor++;
+		bool typeParsed = true;
 		switch (c)
 		{
 		case 'b':
@@ -497,22 +501,14 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 			this->type = g_io_stream_paramType::Pointer;
 			break;
 		default:
+			typeParsed = false;
 			break;
 		}
 
 		// Check if the modifier is capitalized
-		switch (c)
+		if (typeParsed && c >= 'A' && c <= 'Z')
 		{
-		case 'F':
-		case 'A':
-		case 'E':
-		case 'G':
-		case 'B':
-		case 'X':
 			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::CapitalModifier);
-			break;
-		default:
-			break;
 		}
 	}
 
@@ -537,8 +533,15 @@ void g_io_stream::resetModifiers()
 template<typename T>
 static size_t integerToString(char* const buffer, size_t bufferSize, T integer)
 {
+	// Handle buffer overflow while calculating the number of digits
+	T posNumber = integer < 0 ? integer * -1 : integer;
+	if (posNumber == std::numeric_limits<T>().min())
+	{
+		posNumber = std::numeric_limits<T>().max();
+	}
+
 	size_t numDigits = integer != 0
-		? (size_t)floor(log10((double)(integer < 0 ? -1 * integer : integer))) + 1 + (integer < 0 ? 1 : 0)
+		? (size_t)floor(log10((double)posNumber)) + 1 + (integer < 0 ? 1 : 0)
 		: 1;
 	if (numDigits > bufferSize)
 	{
@@ -585,10 +588,23 @@ static size_t integerToHexString(char* const buffer, size_t bufferSize, void* in
 	char* bufferPtr = buffer;
 	char* bufferEnd = (char*)buffer + bufferSize;
 
+	bool mostSignificantBitHit = false;
+
 	// Convert binary number to hex
 	uint8_t* bytePtr = (uint8_t*)(integer)+(integerSize - 1);
 	while (bytePtr >= (uint8_t*)integer && bufferPtr <= bufferEnd)
 	{
+		// Skip leading 0's
+		if (!mostSignificantBitHit)
+		{
+			if (*bytePtr == 0)
+			{
+				bytePtr--;
+				continue;
+			}
+			mostSignificantBitHit = true;
+		}
+
 		// TODO: Maybe we should have compile-time macros that switch this up
 		//       depending on what the target platform architecture is
 		// Assume machine is little-endian and print big-endian style
@@ -597,6 +613,57 @@ static size_t integerToHexString(char* const buffer, size_t bufferSize, void* in
 		if (bufferPtr <= bufferEnd)
 		{
 			*(bufferPtr++) = halfByteToHex(*bytePtr & 0xF, baseA);
+		}
+
+		bytePtr--;
+	}
+
+	return (bufferPtr - buffer);
+}
+
+static size_t dataToBinaryString(char* const buffer, size_t bufferSize, void* data, size_t dataSize)
+{
+	char* bufferPtr = buffer;
+	char* bufferEnd = (char*)buffer + bufferSize;
+
+	bool mostSignificantBitHit = false;
+
+	// Convert binary number to hex
+	uint8_t* bytePtr = (uint8_t*)(data)+(dataSize - 1);
+	while (bytePtr >= (uint8_t*)data && bufferPtr <= bufferEnd)
+	{
+		// Skip leading 0's
+		if (!mostSignificantBitHit)
+		{
+			if (*bytePtr == 0) 
+			{
+				bytePtr--;
+				continue;
+			}
+			mostSignificantBitHit = true;
+		}
+
+		// TODO: Maybe we should have compile-time macros that switch this up
+		//       depending on what the target platform architecture is
+		// Assume machine is little-endian and print big-endian style
+		for (int i = 7; i >= 0; i--)
+		{
+			if (bufferPtr <= bufferEnd)
+			{
+				*(bufferPtr++) = ((*bytePtr >> i) & 0x1) == 1 ? '1' : '0';
+			}
+
+			if (bufferPtr <= bufferEnd && i == 4)
+			{
+				// Add apostrophes every 4 bits for clarity in reading
+				*(bufferPtr++) = '\'';
+			}
+		}
+
+		if (bufferPtr <= bufferEnd && bytePtr > data)
+		{
+			// Add apostrophes every 4 bits for clarity in reading
+			*(bufferPtr++) = '\'';
 		}
 
 		bytePtr--;
@@ -618,13 +685,33 @@ static size_t integerToString(char* const buffer, size_t bufferSize, T integer, 
 	case g_io_stream_paramType::Hexadecimal:
 		return integerToHexString(buffer, bufferSize, &integer, sizeof(T),
 			(uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier);
+	case g_io_stream_paramType::Binary:
+		return dataToBinaryString(buffer, bufferSize, &integer, sizeof(T));
 	}
 
-	throw std::runtime_error("Unknown io stream modifier in integerToString used.");
+	throw std::runtime_error("Unsupported io stream modifier in integerToString used.");
 }
 
-static size_t realNumberToString(double const& number, char* const buffer, size_t bufferSize, int numDigitsAfterDecimal, int expCutoff)
+static size_t realNumberToString(double const& number, char* const buffer, size_t bufferSize, const g_io_stream& io, int expCutoff)
 {
+	switch (io.type)
+	{
+	// Default to fixed point
+	case g_io_stream_paramType::None:
+	case g_io_stream_paramType::FixedPoint:
+		break;
+	case g_io_stream_paramType::ExponentNotation:
+		expCutoff = 0;
+		break;
+	case g_io_stream_paramType::GeneralFormat:
+		// TODO: Arbitrary precision here
+		break;
+	default:
+		throw std::runtime_error("Unsupported io stream modifier in realNumberToString used.");
+	}
+
+	int numDigitsAfterDecimal = io.precision;
+
 	// Handle special cases
 	if (isinf(number))
 	{
@@ -789,7 +876,7 @@ g_io_stream& operator<<(g_io_stream& io, float const& number)
 {
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
-	size_t length = realNumberToString((double)number, buffer, bufferSize, io.precision, 5);
+	size_t length = realNumberToString((double)number, buffer, bufferSize, io, 5);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_float_prefix(io), _g_io_get_float_prefix_size(io), io);
 	return io;
 }
@@ -799,7 +886,7 @@ g_io_stream& operator<<(g_io_stream& io, double const& number)
 {
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
-	size_t length = realNumberToString(number, buffer, bufferSize, io.precision, 5);
+	size_t length = realNumberToString(number, buffer, bufferSize, io, 5);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_float_prefix(io), _g_io_get_float_prefix_size(io), io);
 	return io;
 }
@@ -807,9 +894,8 @@ g_io_stream& operator<<(g_io_stream& io, double const& number)
 template<>
 g_io_stream& operator<<(g_io_stream& io, int8_t const& integer)
 {
-	constexpr size_t bufferSize = 4;
-	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer, io);
+	char buffer[maxIntegerBufferSize];
+	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
@@ -817,9 +903,8 @@ g_io_stream& operator<<(g_io_stream& io, int8_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, int16_t const& integer)
 {
-	constexpr size_t bufferSize = 6;
-	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer, io);
+	char buffer[maxIntegerBufferSize];
+	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
@@ -827,9 +912,8 @@ g_io_stream& operator<<(g_io_stream& io, int16_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, int32_t const& integer)
 {
-	constexpr size_t bufferSize = 11;
-	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer, io);
+	char buffer[maxIntegerBufferSize];
+	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
@@ -837,9 +921,8 @@ g_io_stream& operator<<(g_io_stream& io, int32_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, int64_t const& integer)
 {
-	constexpr size_t bufferSize = 20;
-	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer, io);
+	char buffer[maxIntegerBufferSize];
+	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
@@ -847,9 +930,8 @@ g_io_stream& operator<<(g_io_stream& io, int64_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, uint8_t const& integer)
 {
-	constexpr size_t bufferSize = 4;
-	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer, io);
+	char buffer[maxIntegerBufferSize];
+	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
@@ -857,9 +939,8 @@ g_io_stream& operator<<(g_io_stream& io, uint8_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, uint16_t const& integer)
 {
-	constexpr size_t bufferSize = 6;
-	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer, io);
+	char buffer[maxIntegerBufferSize];
+	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
@@ -867,9 +948,8 @@ g_io_stream& operator<<(g_io_stream& io, uint16_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, uint32_t const& integer)
 {
-	constexpr size_t bufferSize = 11;
-	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer, io);
+	char buffer[maxIntegerBufferSize];
+	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
@@ -877,9 +957,8 @@ g_io_stream& operator<<(g_io_stream& io, uint32_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, uint64_t const& integer)
 {
-	constexpr size_t bufferSize = 21;
-	char buffer[bufferSize];
-	size_t length = integerToString(buffer, bufferSize, integer, io);
+	char buffer[maxIntegerBufferSize];
+	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
 	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
 	return io;
 }
@@ -1135,7 +1214,7 @@ void _g_io_printf_internal(const char* s, size_t length)
 		std::string errorMessage = "String length is invalid '" + std::to_string(length) + "'. Must be >= 0 && <= " + std::to_string(INT32_MAX);
 		throw new std::runtime_error(errorMessage.c_str());
 	}
-}
+		}
 
 #endif // end PLATFORM_IMPLS
 
