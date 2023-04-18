@@ -124,7 +124,7 @@ void mainFunc()
 		g_logger_info("{}", "Hello World!");
 
 		g_DumbString string;
-		if (g_dumbString_new("Hello World!", &string) != g_Utf8ErrorCode_Success)
+		if (g_dumbString("Hello World!", &string) != g_Utf8ErrorCode_Success)
 		{
 			throw std::runtime_error("Failed to make UTF8 string");
 		}
@@ -216,11 +216,11 @@ void mainFunc()
 			123);
 
 		g_logger_info("\n"
-			u8"┌{-:^20}┐\n"
-			u8"|{ :^20}|\n"
-			u8"└{-:^20}┘",
+			u8"\u2554{\u2550:^20}\u2557\n"
+			u8"\u2551{☻:^20}\u2551\n"
+			u8"\u255a{\u2550:^20}\u255d",
 			"",
-			"Hello World!",
+			u8"Hello World!",
 			""
 		);
 

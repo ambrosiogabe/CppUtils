@@ -176,10 +176,10 @@ struct g_io_stream
 {
 	uint16_t precision;
 	uint16_t width;
-	uint8_t fillCharacter;
-	/* u8*/ g_io_stream_align alignment;
-	/*u16*/ g_io_stream_paramType type;
+	uint32_t fillCharacter;
 	/*u32*/ g_io_stream_mods mods;
+	/*u16*/ g_io_stream_paramType type;
+	/* u8*/ g_io_stream_align alignment;
 	/* u8*/ g_io_stream_sign sign;
 
 	void parseModifiers(const char* modifiersStr, size_t length);
@@ -239,7 +239,7 @@ template<typename T, typename...Args>
 GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, const T& value, const Args&... args)
 {
 	size_t stringStart = 0;
-	size_t strLength = 0;
+	size_t numBytes = 0;
 	size_t fmtStart = SIZE_MAX;
 	for (size_t i = 0; i < length; i++)
 	{
@@ -247,15 +247,15 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 		{
 			if (i < length - 1 && s[i + 1] == '{')
 			{
-				_g_io_printf_internal(s + stringStart, strLength);
+				_g_io_printf_internal(s + stringStart, numBytes);
 				_g_io_printf_internal("{", 1);
-				strLength = 0;
+				numBytes = 0;
 				i++;
 				stringStart = i + 1;
 			}
 			else
 			{
-				_g_io_printf_internal(s + stringStart, strLength);
+				_g_io_printf_internal(s + stringStart, numBytes);
 				fmtStart = i + 1;
 			}
 			continue;
@@ -281,7 +281,7 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 		}
 		else
 		{
-			strLength++;
+			numBytes++;
 		}
 	}
 
@@ -319,9 +319,10 @@ g_io_stream g_io_stream_stdout = {
 	0,
 	0,
 	' ',
-	g_io_stream_align::Right,
+	g_io_stream_mods::None,
 	g_io_stream_paramType::None,
-	g_io_stream_mods::None
+	g_io_stream_align::Right,
+	g_io_stream_sign::Positive
 };
 
 // NOTE: Big enough to hold 64 bits (for binary representation) plus an apostrophe every 4 bits (for clarity in reading)
@@ -333,9 +334,9 @@ static const char* _g_io_get_int_prefix(const g_io_stream& io);
 static size_t _g_io_get_int_prefix_size(const g_io_stream& io);
 static const char* _g_io_get_float_prefix(const g_io_stream& io);
 static size_t _g_io_get_float_prefix_size(const g_io_stream& io);
-static inline bool g_io_isWhitespace(char c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
-static inline bool g_io_isDigit(char c) { return c >= '0' && c <= '9'; }
-static inline int32_t g_io_toNumber(char c) { return (int32_t)(c - '0'); }
+static inline bool g_io_isWhitespace(uint32_t c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+static inline bool g_io_isDigit(uint32_t c) { return c >= '0' && c <= '9'; }
+static inline int32_t g_io_toNumber(uint32_t c) { return (int32_t)(c - '0'); }
 
 static int32_t g_io_parseNextInteger(const char* str, size_t length, size_t* numCharactersParsed)
 {
@@ -367,36 +368,39 @@ static int32_t g_io_parseNextInteger(const char* str, size_t length, size_t* num
 	return result;
 }
 
-static char g_io_stream_peek(size_t cursor, const char* str, size_t strLength)
-{
-	if (cursor >= strLength)
-	{
-		return '\0';
-	}
-
-	return str[cursor];
-}
-
 void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 {
 	// format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
-	size_t cursor = 0;
+	g_ParseInfo parseInfo;
+	g_Utf8ErrorCode res = g_parser_makeParser(modifiersStr, length, &parseInfo);
+	if (res != g_Utf8ErrorCode_Success)
+	{
+		throw std::runtime_error("Invalid UTF8 string passed to printf.");
+	}
 
 	// Parse [fill](":")
 	// Return early if end of string is reached with no specifiers
+	uint8_t numBytesParsed;
 	{
-		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
 		if (c != ':' && c != '\0')
 		{
-			this->fillCharacter = g_io_stream_peek(cursor, modifiersStr, length);
-			cursor++;
+			// Instead of copying the unicode codepoint, we'll copy the raw bytes
+			// since they'll get decoded later in the cycle
+			this->fillCharacter = 0;
+			for (size_t i = 0; i < numBytesParsed; i++)
+			{
+				this->fillCharacter = this->fillCharacter | 
+					(parseInfo.utf8String[parseInfo.cursor + i] << ((numBytesParsed - i - 1) * 8));
+			}
+			parseInfo.cursor += numBytesParsed;
 		}
 
-		c = g_io_stream_peek(cursor, modifiersStr, length);
+		c = g_parser_peek(parseInfo, &numBytesParsed);
 		if (c == ':')
 		{
 			// Consume ':' and move on to next parsing stage
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 		}
 		else if (c == '\0')
 		{
@@ -411,20 +415,20 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse [align]
 	{
-		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
 		switch (c)
 		{
 		case '<':
 			this->alignment = g_io_stream_align::Left;
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 			break;
 		case '>':
 			this->alignment = g_io_stream_align::Right;
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 			break;
 		case '^':
 			this->alignment = g_io_stream_align::Center;
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 			break;
 		default:
 			break;
@@ -433,20 +437,20 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse [sign]
 	{
-		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
 		switch (c)
 		{
 		case '+':
 			this->sign = g_io_stream_sign::Positive;
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 			break;
 		case '-':
 			this->sign = g_io_stream_sign::Negative;
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 			break;
 		case ' ':
 			this->sign = g_io_stream_sign::Space;
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 			break;
 		default:
 			break;
@@ -455,57 +459,57 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse ["#"] alt form shebang
 	{
-		if (g_io_stream_peek(cursor, modifiersStr, length) == '#')
+		if (g_parser_peek(parseInfo, &numBytesParsed) == '#')
 		{
 			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::AltFormat);
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 		}
 	}
 
 	// Parse [width]
 	{
-		char c = g_io_stream_peek(cursor, modifiersStr, length);
+		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
 		if (g_io_isDigit(c))
 		{
-			size_t numCharsParsed;
-			uint32_t parsedNumber = g_io_parseNextInteger(modifiersStr + cursor, length - cursor, &numCharsParsed);
+			size_t numBytesParsedForNum;
+			uint32_t parsedNumber = g_io_parseNextInteger(modifiersStr + parseInfo.cursor, length - parseInfo.cursor, &numBytesParsedForNum);
 			if (parsedNumber >= UINT16_MAX)
 			{
 				throw std::runtime_error("Invalid format specification. Width can only be specified up to UINT16_MAX digits.");
 			}
 			this->width = (uint16_t)parsedNumber;
-			cursor += numCharsParsed;
+			parseInfo.cursor += numBytesParsedForNum;
 		}
 	}
 
 	// Parse ["." precision]
 	{
-		if (g_io_stream_peek(cursor, modifiersStr, length) == '.')
+		if (g_parser_peek(parseInfo, &numBytesParsed) == '.')
 		{
 			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::PrecisionSet);
-			cursor++;
+			parseInfo.cursor += numBytesParsed;
 
 			// Parse precision digits
-			if (!g_io_isDigit(g_io_stream_peek(cursor, modifiersStr, length)))
+			if (!g_io_isDigit(g_parser_peek(parseInfo, &numBytesParsed)))
 			{
 				throw std::runtime_error("Invalid format specification. \".\" must be followed by an integer to specify a precision width.");
 			}
 
-			size_t numCharsParsed;
-			int32_t parsedNumber = g_io_parseNextInteger(modifiersStr + cursor, length - cursor, &numCharsParsed);
+			size_t numBytesParsedForNum;
+			int32_t parsedNumber = g_io_parseNextInteger(modifiersStr + parseInfo.cursor, length - parseInfo.cursor, &numBytesParsedForNum);
 			if (parsedNumber >= UINT16_MAX)
 			{
 				throw std::runtime_error("Invalid format specification. Precision can only be up to UINT16_MAX digits in [\".\" precision] of format specifier.");
 			}
 			this->precision = (uint16_t)parsedNumber;
-			cursor += numCharsParsed;
+			parseInfo.cursor += numBytesParsedForNum;
 		}
 	}
 
 	// Parse type
 	{
-		char c = g_io_stream_peek(cursor, modifiersStr, length);
-		cursor++;
+		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
+		parseInfo.cursor += numBytesParsed;
 		bool typeParsed = true;
 		switch (c)
 		{
@@ -558,7 +562,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 	}
 
 	// Make sure we finished parsing the whole thing, otherwise error out
-	if (cursor < length)
+	if (parseInfo.cursor < length)
 	{
 		throw std::runtime_error("Invalid format specifier. Expected end of format specifier \"}\" after [\"type\"], but string continued.");
 	}
@@ -1044,7 +1048,12 @@ static void _g_io_print_string_formatted(const char* content, size_t contentLeng
 		_g_io_printf_internal(prefix, prefixLength);
 	}
 
-	size_t totalContentLength = prefixLength + contentLength;
+	size_t numCharsInContent;
+	if (g_dumbString_utf8Length(content, contentLength, &numCharsInContent) != g_Utf8ErrorCode_Success)
+	{
+		throw std::runtime_error("Tried to print invalid UTF8 string in printf.");
+	}
+	size_t totalContentLength = prefixLength + numCharsInContent;
 	uint32_t leftPadding = 0;
 	uint32_t rightPadding = 0;
 	if (io.width != 0)
@@ -1082,19 +1091,36 @@ static void _g_io_print_string_formatted(const char* content, size_t contentLeng
 	}
 
 	// Only allocate scratch memory if needed
+	uint8_t numBytesInChar = 1;
+	if (io.fillCharacter >= 0xFF'FF'FF)
+	{
+		numBytesInChar = 4;
+	}
+	else if (io.fillCharacter >= 0xFF'FF)
+	{
+		numBytesInChar = 3;
+	}
+	else if (io.fillCharacter >= 0xFF)
+	{
+		numBytesInChar = 2;
+	}
+
 	constexpr size_t smallStringBufferSize = 32;
 	char smallStringBuffer[smallStringBufferSize];
-	char* scratchMemory = (leftPadding + rightPadding) > smallStringBufferSize
-		? (char*)malloc(sizeof(char) * leftPadding + rightPadding)
+	char* scratchMemory = (leftPadding + rightPadding) * numBytesInChar > smallStringBufferSize
+		? (char*)malloc(sizeof(char) * (leftPadding + rightPadding) * numBytesInChar)
 		: smallStringBuffer;
 	if (leftPadding > 0)
 	{
 		for (size_t i = 0; i < leftPadding; i++)
 		{
-			scratchMemory[i] = io.fillCharacter;
+			for (size_t j = 0; j < numBytesInChar; j++)
+			{
+				scratchMemory[(i * numBytesInChar) + j] = (uint8_t)((io.fillCharacter >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
+			}
 		}
 
-		_g_io_printf_internal(scratchMemory, leftPadding);
+		_g_io_printf_internal(scratchMemory, leftPadding * numBytesInChar);
 	}
 
 	_g_io_printf_internal(content, contentLength);
@@ -1103,13 +1129,16 @@ static void _g_io_print_string_formatted(const char* content, size_t contentLeng
 	{
 		for (size_t i = leftPadding; i < rightPadding; i++)
 		{
-			scratchMemory[i] = io.fillCharacter;
+			for (size_t j = 0; j < numBytesInChar; j++)
+			{
+				scratchMemory[i] = (uint8_t)((io.fillCharacter >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
+			}
 		}
 
-		_g_io_printf_internal(scratchMemory, rightPadding);
+		_g_io_printf_internal(scratchMemory, rightPadding * numBytesInChar);
 	}
 
-	if (leftPadding + rightPadding > smallStringBufferSize)
+	if ((leftPadding + rightPadding) * numBytesInChar > smallStringBufferSize)
 	{
 		free(scratchMemory);
 	}
