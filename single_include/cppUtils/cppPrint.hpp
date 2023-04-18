@@ -1011,7 +1011,7 @@ g_io_stream& operator<<(g_io_stream& io, uint64_t const& integer)
 template<>
 g_io_stream& operator<<(g_io_stream& io, g_DumbString const& dumbString)
 {
-	_g_io_print_string_formatted((const char*)dumbString.str, dumbString.numBytes, "", 0, io);
+	_g_io_print_string_formatted((const char*)dumbString.data, dumbString.numBytes, "", 0, io);
 	return io;
 }
 

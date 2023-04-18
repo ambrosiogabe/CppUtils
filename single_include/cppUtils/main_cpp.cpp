@@ -123,7 +123,11 @@ void mainFunc()
 	{
 		g_logger_info("{}", "Hello World!");
 
-		g_DumbString string = g_dumbString_new("Hello World!");
+		g_DumbString string;
+		if (g_dumbString_new("Hello World!", &string) != g_Utf8ErrorCode_Success)
+		{
+			throw std::runtime_error("Failed to make UTF8 string");
+		}
 		g_logger_info("{}, {}", string, 2.3f);
 		g_dumbString_free(string);
 
@@ -220,7 +224,7 @@ void mainFunc()
 			""
 		);
 
-		g_logger_info(u8"Test some unicode strings\n"
+		g_logger_info(u8"∏ Test some unicode strings ∏\n"
 			u8"     checkmark: \u2713 \n"
 			u8"        x-mark: \u2a2f \n"
 		    u8"       o-slash: \u00D8 \n"
