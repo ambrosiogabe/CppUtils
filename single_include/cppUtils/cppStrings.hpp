@@ -132,26 +132,6 @@ g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_peek(g_ParseInfo& parseInfo, uint8_t
 
 #ifdef GABE_CPP_STRINGS_IMPL
 #include <cppUtils/cppUtils.hpp>
-#include <stdexcept>
-
-// ------------- Internal variables -------------
-static constexpr uint8_t numOctetMasks = 4;
-static constexpr uint8_t OCTET_BYTE_ONE_MASKS[numOctetMasks] = {
-	0b0,
-	0b110,
-	0b1110,
-	0b1111'0
-};
-
-static constexpr uint8_t OCTET_SHIFT_AMTS[numOctetMasks] = {
-	7,
-	5,
-	4,
-	3
-};
-
-static constexpr uint8_t OCTET_EXTRA_BYTE_MASK = 0b10;
-static constexpr uint8_t OCTET_EXTRA_BYTE_SHIFT_AMT = 6;
 
 // ------------- Internal Functions -------------
 static size_t getNumBytesTilNull(const char* rawString);
@@ -350,6 +330,25 @@ static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, siz
 		return g_Utf8ErrorCode_InvalidString;
 	}
 
+	// ------- Useful Constants -------
+	constexpr uint8_t numOctetMasks = 4;
+	constexpr uint8_t OCTET_BYTE_ONE_MASKS[numOctetMasks] = {
+		0b0,
+		0b110,
+		0b1110,
+		0b1111'0
+	};
+
+	constexpr uint8_t OCTET_SHIFT_AMTS[numOctetMasks] = {
+		7,
+		5,
+		4,
+		3
+	};
+
+	constexpr uint8_t OCTET_EXTRA_BYTE_MASK = 0b10;
+	constexpr uint8_t OCTET_EXTRA_BYTE_SHIFT_AMT = 6;
+
 	bool oneBytePass = (string[cursor] >> OCTET_SHIFT_AMTS[0]) == OCTET_BYTE_ONE_MASKS[0];
 	bool twoBytePass = (string[cursor] >> OCTET_SHIFT_AMTS[1]) == OCTET_BYTE_ONE_MASKS[1];
 	bool threeBytePass = (string[cursor] >> OCTET_SHIFT_AMTS[2]) == OCTET_BYTE_ONE_MASKS[2];
@@ -414,76 +413,87 @@ static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, s
 		return g_Utf8ErrorCode_InvalidString;
 	}
 
-	uint32_t res = 0;
-	{
-		uint8_t bitMask = 0b0011'1111;
-		for (uint8_t i = numOctets - 1; i > 0; i--)
-		{
-			uint8_t maskedBits = rawString[cursor + i] & bitMask;
-			uint8_t shiftAmt = (numOctets - i - 1) * 6;
-			res = res | ((uint32_t)maskedBits << shiftAmt);
-		}
-	}
-
-	switch (numOctets)
-	{
-	case 1:
+	// Simple case, just return the masked byte
+	if (numOctets == 1)
 	{
 		uint8_t bitMask = 0b0111'1111;
 		uint8_t maskedBits = rawString[cursor] & bitMask;
-		res = res | (uint32_t)maskedBits;
+		uint32_t res = (uint32_t)maskedBits;
 
 		// Invalid range
 		if (res > 0x007f)
 		{
 			return g_Utf8ErrorCode_InvalidString;
 		}
+
+		return res;
 	}
-	break;
+
+	uint32_t res = 0;
+	uint8_t lowOctetBitmask = 0b0011'1111;
+	uint8_t maskedByte1 = rawString[(cursor + 1) % numOctets] & lowOctetBitmask;
+	uint8_t maskedByte2 = rawString[(cursor + 2) % numOctets] & lowOctetBitmask;
+	uint8_t maskedByte3 = rawString[(cursor + 3) % numOctets] & lowOctetBitmask;
+
+	switch (numOctets)
+	{
 	case 2:
 	{
-		uint8_t bitMask = 0b0001'1111;
-		uint8_t maskedBits = rawString[cursor] & bitMask;
-		res = res | ((uint32_t)maskedBits << 6);
+		uint8_t byte0Bitmask = 0b0001'1111;
+		uint8_t maskedByte0 = rawString[cursor] & byte0Bitmask;
+
+		res = res | ((uint32_t)maskedByte0 << 6);
+		res = res | ((uint32_t)maskedByte1);
 
 		// Invalid range
 		if (res < 0x0080 || res > 0x07ff)
 		{
 			return g_Utf8ErrorCode_InvalidString;
 		}
+
+		return res;
 	}
 	break;
 	case 3:
 	{
-		uint8_t bitMask = 0b0000'1111;
-		uint8_t maskedBits = rawString[cursor] & bitMask;
-		res = res | ((uint32_t)maskedBits << 12);
+		uint8_t byte0Bitmask = 0b0000'1111;
+		uint8_t maskedByte0 = rawString[cursor] & byte0Bitmask;
+
+		res = res | ((uint32_t)maskedByte2);
+		res = res | ((uint32_t)maskedByte1 << 6);
+		res = res | ((uint32_t)maskedByte0 << 12);
 
 		// Invalid range
 		if (res < 0x0800 || res > 0xffff)
 		{
 			return g_Utf8ErrorCode_InvalidString;
 		}
+
+		return res;
 	}
 	break;
 	case 4:
 	{
-		uint8_t bitMask = 0b0000'0111;
-		uint8_t maskedBits = rawString[cursor] & bitMask;
-		res = res | ((uint32_t)maskedBits << 18);
+		uint8_t byte0Bitmask = 0b0000'0111;
+		uint8_t maskedByte0 = rawString[cursor] & byte0Bitmask;
+
+		res = res | ((uint32_t)maskedByte3);
+		res = res | ((uint32_t)maskedByte2 << 6);
+		res = res | ((uint32_t)maskedByte1 << 12);
+		res = res | ((uint32_t)maskedByte0 << 18);
 
 		// Invalid range
 		if (res < 0x001'0000 || res > 0x0010'ffff)
 		{
 			return g_Utf8ErrorCode_InvalidString;
 		}
+
+		return res;
 	}
 	break;
-	default:
-		return g_Utf8ErrorCode_InvalidString;
 	}
 
-	return res;
+	return g_Utf8ErrorCode_InvalidString;
 }
 
 #endif // GABE_CPP_STRINGS_IMPL

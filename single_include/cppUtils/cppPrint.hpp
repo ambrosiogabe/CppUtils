@@ -241,7 +241,7 @@ g_io_stream& operator<<(g_io_stream& io, g_Maybe<T, E> const& maybeVal)
 	}
 	else
 	{
-		io << "<nullopt, error=" << maybeVal.error() << ">";
+		io << "<Maybe=Error, '" << maybeVal.error() << "'>";
 	}
 	return io;
 }

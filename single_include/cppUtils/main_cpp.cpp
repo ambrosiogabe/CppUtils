@@ -133,6 +133,11 @@ void mainFunc()
 		//       pass the data forwards whether it's valid or not
 		g_dumbString_free(badString);
 
+		const uint8_t moreInvalidUtf8Data[] = { 0xED, 0xA1, 0x8C, 0xED, 0xBE, 0xB4 };
+		auto anotherBadString = g_dumbString((const char*)moreInvalidUtf8Data);
+		g_logger_info("{}", anotherBadString);
+		g_dumbString_free(anotherBadString);
+
 		auto string = g_dumbString(u8"Hello World!");
 		g_DumbString& unboxedString = string.mut_value();
 		g_logger_info("{}, {}", unboxedString, 2.3f);
