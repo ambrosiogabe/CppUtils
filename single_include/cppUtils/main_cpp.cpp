@@ -125,7 +125,15 @@ void mainFunc()
 	{
 		g_logger_info("{}", "Hello World!");
 
-		auto string = g_dumbString("Hello World!");
+		const uint8_t invalidUtf8Data[] = { 0xc0, 0x80, 0x00 };
+		auto badString = g_dumbString((const char*)invalidUtf8Data);
+		g_logger_info("{}", badString);
+		if (badString.hasValue())
+		{
+			g_dumbString_free(badString.mut_value());
+		}
+
+		auto string = g_dumbString(u8"Hello World!");
 		g_DumbString& unboxedString = string.mut_value();
 		g_logger_info("{}, {}", unboxedString, 2.3f);
 		g_dumbString_free(unboxedString);
@@ -226,11 +234,11 @@ void mainFunc()
 		g_logger_info(u8"∏ Test some unicode strings ∏\n"
 			u8"     checkmark: \u2713 \n"
 			u8"        x-mark: \u2a2f \n"
-		    u8"       o-slash: \u00D8 \n"
-		    u8"      small-xi: \u03be \n"
-		    u8"     small-phi: \u03C6 \n"
-		    u8"special-quotes: \u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B \n"
-		    u8"        arrows: \u2192 \u2190 \u2191 \u2193 \u2194 \u2195");
+			u8"       o-slash: \u00D8 \n"
+			u8"      small-xi: \u03be \n"
+			u8"     small-phi: \u03C6 \n"
+			u8"special-quotes: \u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B \n"
+			u8"        arrows: \u2192 \u2190 \u2191 \u2193 \u2194 \u2195");
 	}
 
 	g_memory_dumpMemoryLeaks();

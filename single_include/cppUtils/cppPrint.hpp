@@ -398,8 +398,13 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 	// Return early if end of string is reached with no specifiers
 	uint8_t numBytesParsed;
 	{
-		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
-		if (c != ':' && c != '\0')
+		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
+		if (*c != ':' && *c != '\0')
 		{
 			// Instead of copying the unicode codepoint, we'll copy the raw bytes
 			// since they'll get decoded later in the cycle
@@ -413,12 +418,17 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 		}
 
 		c = g_parser_peek(parseInfo, &numBytesParsed);
-		if (c == ':')
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
+		if (*c == ':')
 		{
 			// Consume ':' and move on to next parsing stage
 			parseInfo.cursor += numBytesParsed;
 		}
-		else if (c == '\0')
+		else if (*c == '\0')
 		{
 			// No format specified use default
 			return;
@@ -431,8 +441,13 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse [align]
 	{
-		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
-		switch (c)
+		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
+		switch (*c)
 		{
 		case '<':
 			this->alignment = g_io_stream_align::Left;
@@ -453,8 +468,13 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse [sign]
 	{
-		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
-		switch (c)
+		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
+		switch (*c)
 		{
 		case '+':
 			this->sign = g_io_stream_sign::Positive;
@@ -475,7 +495,13 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse ["#"] alt form shebang
 	{
-		if (g_parser_peek(parseInfo, &numBytesParsed) == '#')
+		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
+		if (*c == '#')
 		{
 			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::AltFormat);
 			parseInfo.cursor += numBytesParsed;
@@ -484,8 +510,13 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse [width]
 	{
-		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
-		if (g_io_isDigit(c))
+		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
+		if (g_io_isDigit(*c))
 		{
 			size_t numBytesParsedForNum;
 			uint32_t parsedNumber = g_io_parseNextInteger(modifiersStr + parseInfo.cursor, length - parseInfo.cursor, &numBytesParsedForNum);
@@ -500,13 +531,25 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse ["." precision]
 	{
-		if (g_parser_peek(parseInfo, &numBytesParsed) == '.')
+		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
+		if (*c == '.')
 		{
 			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::PrecisionSet);
 			parseInfo.cursor += numBytesParsed;
 
 			// Parse precision digits
-			if (!g_io_isDigit(g_parser_peek(parseInfo, &numBytesParsed)))
+			c = g_parser_peek(parseInfo, &numBytesParsed);
+			if (!c.hasValue())
+			{
+				throw std::runtime_error("Invalid UTF8 string passed to printf.");
+			}
+
+			if (!g_io_isDigit(*c))
 			{
 				throw std::runtime_error("Invalid format specification. \".\" must be followed by an integer to specify a precision width.");
 			}
@@ -524,10 +567,15 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse type
 	{
-		uint32_t c = g_parser_peek(parseInfo, &numBytesParsed);
+		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
 		parseInfo.cursor += numBytesParsed;
 		bool typeParsed = true;
-		switch (c)
+		switch (*c)
 		{
 		case 'b':
 		case 'B':
@@ -571,7 +619,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 		}
 
 		// Check if the modifier is capitalized
-		if (typeParsed && c >= 'A' && c <= 'Z')
+		if (typeParsed && *c >= 'A' && *c <= 'Z')
 		{
 			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::CapitalModifier);
 		}

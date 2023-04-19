@@ -24,7 +24,7 @@ struct g_Maybe
 	constexpr inline const T& value() const { return std::get<T>(data); }
 
 	[[nodiscard]]
-	constexpr inline T &mut_value() { return std::get<T>(data); }
+	constexpr inline T& mut_value() { return std::get<T>(data); }
 
 	[[nodiscard]]
 	constexpr inline E error() const { return std::get<E>(data); }

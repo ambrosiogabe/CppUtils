@@ -124,8 +124,8 @@ g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString,
 g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString);
 inline g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const g_DumbString& dumbString) { return g_parser_makeParser((const char*)dumbString.data, dumbString.numBytes); }
 
-uint32_t g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset = 0);
-uint32_t g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount = 0);
+g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset = 0);
+g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount = 0);
 
 #endif // GABE_CPP_STRINGS_H
 
@@ -155,6 +155,7 @@ static constexpr uint8_t OCTET_EXTRA_BYTE_SHIFT_AMT = 6;
 // ------------- Internal Functions -------------
 static size_t getNumBytesTilNull(const char* rawString);
 static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* rawString, size_t numBytes, size_t cursor);
+static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, size_t numBytes, uint8_t numOctets, size_t cursor);
 
 g_io_stream& operator<<(g_io_stream& io, g_Utf8ErrorCode error)
 {
@@ -174,25 +175,22 @@ g_io_stream& operator<<(g_io_stream& io, g_Utf8ErrorCode error)
 g_Maybe<g_DumbString, g_Utf8ErrorCode> g_dumbString(const char* rawString)
 {
 	size_t numBytes = getNumBytesTilNull(rawString);
+	g_Maybe<size_t, g_Utf8ErrorCode> numCharacters = g_dumbString_utf8Length(rawString, numBytes);
+	if (!numCharacters.hasValue())
+	{
+		return numCharacters.error();
+	}
+
 	uint8_t* dumbString = (uint8_t*)g_memory_allocate((numBytes + 1) * sizeof(uint8_t));
 
 	g_memory_copyMem(dumbString, (void*)rawString, numBytes * sizeof(uint8_t));
 	dumbString[numBytes] = '\0';
 
-	g_DumbString res = {
+	return g_DumbString{
 		dumbString,
 		numBytes,
-		0
+		numCharacters.value()
 	};
-
-	g_Maybe<size_t, g_Utf8ErrorCode> numCharacters = g_dumbString_utf8Length(rawString);
-	if (numCharacters.hasValue())
-	{
-		res.numCharacters = numCharacters.mut_value();
-		return res;
-	}
-
-	return numCharacters.error();
 }
 
 g_Maybe<g_DumbConstantString, g_Utf8ErrorCode> g_dumbConstantString(const char* rawStringLiteral)
@@ -234,6 +232,12 @@ g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString, 
 			return numOctets.error();
 		}
 
+		auto decodedChar = decodeChar((const uint8_t*)rawString, numBytes, numOctets.value(), i);
+		if (!decodedChar.hasValue())
+		{
+			return decodedChar.error();
+		}
+
 		numCharacters++;
 		i += numOctets.value();
 	}
@@ -263,8 +267,6 @@ g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString,
 	res.cursor = 0;
 	res.numBytes = numBytes;
 	res.utf8String = (const uint8_t*)rawString;
-
-	// TODO: Validate the UTF8 string up front so that we can parse the string in safety
 	return res;
 }
 
@@ -273,71 +275,32 @@ g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString)
 	return g_parser_makeParser(rawString, getNumBytesTilNull(rawString));
 }
 
-uint32_t g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset)
+g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset)
 {
 	auto numOctets = getNumOctets(parseInfo.utf8String, parseInfo.numBytes, parseInfo.cursor + offset);
 	if (!numOctets.hasValue())
 	{
-		throw std::runtime_error("Invalid UTF8 string somehow encountered during parsing. This means the validation of the UTF8 string failed for some reason.");
+		return numOctets.error();
 	}
 
-	uint32_t res = 0;
+	auto character = decodeChar(parseInfo.utf8String, parseInfo.numBytes, numOctets.value(), offset + parseInfo.cursor);
+	if (!character.hasValue())
 	{
-		uint8_t bitMask = 0b0011'1111;
-		for (uint8_t i = *numOctets - 1; i > 0; i--)
-		{
-			uint8_t maskedBits = parseInfo.utf8String[parseInfo.cursor + i + offset] & bitMask;
-			uint8_t shiftAmt = (*numOctets - i - 1) * 6;
-			res = res | ((uint32_t)maskedBits << shiftAmt);
-		}
-	}
-
-	switch (*numOctets)
-	{
-	case 1:
-	{
-		uint8_t bitMask = 0b0111'1111;
-		uint8_t maskedBits = parseInfo.utf8String[parseInfo.cursor + offset] & bitMask;
-		res = res | (uint32_t)maskedBits;
-	}
-	break;
-	case 2:
-	{
-		uint8_t bitMask = 0b0001'1111;
-		uint8_t maskedBits = parseInfo.utf8String[parseInfo.cursor + offset] & bitMask;
-		res = res | ((uint32_t)maskedBits << 6);
-	}
-	break;
-	case 3:
-	{
-		uint8_t bitMask = 0b0000'1111;
-		uint8_t maskedBits = parseInfo.utf8String[parseInfo.cursor + offset] & bitMask;
-		res = res | ((uint32_t)maskedBits << 12);
-	}
-	break;
-	case 4:
-	{
-		uint8_t bitMask = 0b0000'0111;
-		uint8_t maskedBits = parseInfo.utf8String[parseInfo.cursor + offset] & bitMask;
-		res = res | ((uint32_t)maskedBits << 18);
-	}
-	break;
-	default:
-		throw std::runtime_error("Unknown number of octets hit while parsing a UTF8 string.");
+		return character.error();
 	}
 
 	*numBytesParsed = *numOctets;
-	return res;
+	return character.value();
 }
 
-uint32_t g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount)
+g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount)
 {
 	if (parseInfo.cursor >= parseInfo.numBytes)
 	{
 		return '\0';
 	}
 
-	uint32_t res = 0;
+	g_Maybe<uint32_t, g_Utf8ErrorCode> res = 0;
 
 	size_t peekCursorPos = 0;
 	size_t numCharsParsed = 0;
@@ -345,6 +308,11 @@ uint32_t g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t p
 	{
 		uint8_t numBytesParsedInternal = 0;
 		res = g_parser_parseCharacter(parseInfo, &numBytesParsedInternal, peekCursorPos);
+		if (!res.hasValue())
+		{
+			return res.error();
+		}
+
 		peekCursorPos += numBytesParsedInternal;
 		numCharsParsed++;
 	}
@@ -428,6 +396,85 @@ static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, siz
 	}
 
 	return g_Utf8ErrorCode_InvalidString;
+}
+
+static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, size_t numBytes, uint8_t numOctets, size_t cursor)
+{
+	if (cursor + numOctets > numBytes)
+	{
+		return g_Utf8ErrorCode_InvalidString;
+	}
+
+	uint32_t res = 0;
+	{
+		uint8_t bitMask = 0b0011'1111;
+		for (uint8_t i = numOctets - 1; i > 0; i--)
+		{
+			uint8_t maskedBits = rawString[cursor + i] & bitMask;
+			uint8_t shiftAmt = (numOctets - i - 1) * 6;
+			res = res | ((uint32_t)maskedBits << shiftAmt);
+		}
+	}
+
+	switch (numOctets)
+	{
+	case 1:
+	{
+		uint8_t bitMask = 0b0111'1111;
+		uint8_t maskedBits = rawString[cursor] & bitMask;
+		res = res | (uint32_t)maskedBits;
+
+		// Invalid range
+		if (res > 0x007f)
+		{
+			return g_Utf8ErrorCode_InvalidString;
+		}
+	}
+	break;
+	case 2:
+	{
+		uint8_t bitMask = 0b0001'1111;
+		uint8_t maskedBits = rawString[cursor] & bitMask;
+		res = res | ((uint32_t)maskedBits << 6);
+
+		// Invalid range
+		if (res < 0x0080 || res > 0x07ff)
+		{
+			return g_Utf8ErrorCode_InvalidString;
+		}
+	}
+	break;
+	case 3:
+	{
+		uint8_t bitMask = 0b0000'1111;
+		uint8_t maskedBits = rawString[cursor] & bitMask;
+		res = res | ((uint32_t)maskedBits << 12);
+
+		// Invalid range
+		if (res < 0x0800 || res > 0xffff)
+		{
+			return g_Utf8ErrorCode_InvalidString;
+		}
+	}
+	break;
+	case 4:
+	{
+		uint8_t bitMask = 0b0000'0111;
+		uint8_t maskedBits = rawString[cursor] & bitMask;
+		res = res | ((uint32_t)maskedBits << 18);
+
+		// Invalid range
+		if (res < 0x001'0000 || res > 0x0010'ffff)
+		{
+			return g_Utf8ErrorCode_InvalidString;
+		}
+	}
+	break;
+	default:
+		return g_Utf8ErrorCode_InvalidString;
+	}
+
+	return res;
 }
 
 #endif // GABE_CPP_STRINGS_IMPL
