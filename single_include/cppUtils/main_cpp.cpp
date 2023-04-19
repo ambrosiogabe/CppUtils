@@ -128,10 +128,10 @@ void mainFunc()
 		const uint8_t invalidUtf8Data[] = { 0xc0, 0x80, 0x00 };
 		auto badString = g_dumbString((const char*)invalidUtf8Data);
 		g_logger_info("{}", badString);
-		if (badString.hasValue())
-		{
-			g_dumbString_free(badString.mut_value());
-		}
+		// NOTE: This is unnecessary since the string won't allocate if it's an invalid UTF8 string
+		//       but it's nice in case you're not checking for that type of stuff and just want to
+		//       pass the data forwards whether it's valid or not
+		g_dumbString_free(badString);
 
 		auto string = g_dumbString(u8"Hello World!");
 		g_DumbString& unboxedString = string.mut_value();

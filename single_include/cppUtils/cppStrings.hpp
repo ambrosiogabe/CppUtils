@@ -101,6 +101,7 @@ g_io_stream& operator<<(g_io_stream& io, g_Utf8ErrorCode error);
 g_Maybe<g_DumbConstantString, g_Utf8ErrorCode> g_dumbConstantString(const char* rawStringLiteral);
 g_Maybe<g_DumbString, g_Utf8ErrorCode> g_dumbString(const char* rawString);
 
+void g_dumbString_free(g_Maybe<g_DumbString, g_Utf8ErrorCode>& string);
 void g_dumbString_free(g_DumbString& string);
 
 g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString);
@@ -211,6 +212,14 @@ g_Maybe<g_DumbConstantString, g_Utf8ErrorCode> g_dumbConstantString(const char* 
 	}
 
 	return numCharacters.error();
+}
+
+void g_dumbString_free(g_Maybe<g_DumbString, g_Utf8ErrorCode>& string)
+{
+	if (string.hasValue())
+	{
+		g_dumbString_free(string.mut_value());
+	}
 }
 
 void g_dumbString_free(g_DumbString& string)
@@ -341,10 +350,10 @@ static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, siz
 		return g_Utf8ErrorCode_InvalidString;
 	}
 
-	bool oneBytePass   = (string[cursor] >> OCTET_SHIFT_AMTS[0]) == OCTET_BYTE_ONE_MASKS[0];
-	bool twoBytePass   = (string[cursor] >> OCTET_SHIFT_AMTS[1]) == OCTET_BYTE_ONE_MASKS[1];
+	bool oneBytePass = (string[cursor] >> OCTET_SHIFT_AMTS[0]) == OCTET_BYTE_ONE_MASKS[0];
+	bool twoBytePass = (string[cursor] >> OCTET_SHIFT_AMTS[1]) == OCTET_BYTE_ONE_MASKS[1];
 	bool threeBytePass = (string[cursor] >> OCTET_SHIFT_AMTS[2]) == OCTET_BYTE_ONE_MASKS[2];
-	bool fourBytePass  = (string[cursor] >> OCTET_SHIFT_AMTS[3]) == OCTET_BYTE_ONE_MASKS[3];
+	bool fourBytePass = (string[cursor] >> OCTET_SHIFT_AMTS[3]) == OCTET_BYTE_ONE_MASKS[3];
 
 	uint8_t numOctets = 0;
 	bool pass = false;
@@ -352,7 +361,7 @@ static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, siz
 	{
 		numOctets = 1;
 		pass = true;
-	} 
+	}
 	else if (twoBytePass)
 	{
 		if (cursor + 1 >= numBytes)
