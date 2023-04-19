@@ -129,22 +129,22 @@ uint32_t g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t p
 
 // ------------- Internal variables -------------
 static constexpr uint8_t numOctetMasks = 4;
-static constexpr uint8_t OCTET_MASKS[numOctetMasks] = {
-	0b0000'0000,
-	0b1100'0000,
-	0b1110'0000,
-	0b1111'0000
+static constexpr uint8_t OCTET_BYTE_ONE_MASKS[numOctetMasks] = {
+	0b0,
+	0b110,
+	0b1110,
+	0b1111'0
 };
 
-static constexpr uint8_t OCTET_0_MASKS[numOctetMasks] = {
-	0b1000'0000,
-	0b0010'0000,
-	0b0001'0000,
-	0b0000'1000,
+static constexpr uint8_t OCTET_SHIFT_AMTS[numOctetMasks] = {
+	7,
+	5,
+	4,
+	3
 };
 
-static constexpr uint8_t ONE_ZERO_MASK = 0b1000'0000;
-static constexpr uint8_t ONE_ZERO_0_MASK = 0b0100'0000;
+static constexpr uint8_t OCTET_EXTRA_BYTE_MASK = 0b10;
+static constexpr uint8_t OCTET_EXTRA_BYTE_SHIFT_AMT = 6;
 
 // ------------- Internal Functions -------------
 static size_t getNumBytesTilNull(const char* rawString);
@@ -340,42 +340,61 @@ static uint8_t getNumOctets(const uint8_t* string, size_t numBytes, size_t curso
 		return g_Utf8ErrorCode_InvalidString;
 	}
 
+	bool oneBytePass   = (string[cursor] >> OCTET_SHIFT_AMTS[0]) == OCTET_BYTE_ONE_MASKS[0];
+	bool twoBytePass   = (string[cursor] >> OCTET_SHIFT_AMTS[1]) == OCTET_BYTE_ONE_MASKS[1];
+	bool threeBytePass = (string[cursor] >> OCTET_SHIFT_AMTS[2]) == OCTET_BYTE_ONE_MASKS[2];
+	bool fourBytePass  = (string[cursor] >> OCTET_SHIFT_AMTS[3]) == OCTET_BYTE_ONE_MASKS[3];
+
 	uint8_t numOctets = 0;
-	for (uint8_t i = 0; i < numOctetMasks; i++)
+	bool pass = false;
+	if (oneBytePass)
 	{
-		bool octetMaskPass = (string[cursor] & OCTET_MASKS[i]) == OCTET_MASKS[i];
-		bool zeroMaskPass = (string[cursor] & OCTET_0_MASKS[i]) < OCTET_0_MASKS[i];
-		if (octetMaskPass && zeroMaskPass)
-		{
-			numOctets = (i + 1);
-			cursor++;
-			break;
-		}
-	}
-
-	if (numOctets == 0)
+		numOctets = 1;
+		pass = true;
+	} 
+	else if (twoBytePass)
 	{
-		return g_Utf8ErrorCode_InvalidString;
-	}
-
-	// Validate the following bytes, if any of them are invalid then
-	// we return the appropriate error code
-	for (uint8_t i = 1; i < numOctets; i++)
-	{
-		if (cursor >= numBytes)
+		if (cursor + 1 >= numBytes)
 		{
 			return g_Utf8ErrorCode_InvalidString;
 		}
 
-		bool highBitPass = (string[cursor] & ONE_ZERO_MASK) == ONE_ZERO_MASK;
-		bool secondHighBitPass = (string[cursor] & ONE_ZERO_0_MASK) < ONE_ZERO_0_MASK;
-		if (!highBitPass || !secondHighBitPass)
+		bool secondByteValid = (string[cursor + 1] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
+		numOctets = 2;
+		pass = secondByteValid;
+	}
+	else if (threeBytePass)
+	{
+		if (cursor + 2 >= numBytes)
 		{
 			return g_Utf8ErrorCode_InvalidString;
 		}
+
+		bool secondByteValid = (string[cursor + 1] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
+		bool thirdByteValid = (string[cursor + 2] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
+		numOctets = 3;
+		pass = secondByteValid && thirdByteValid;
+	}
+	else if (fourBytePass)
+	{
+		if (cursor + 3 >= numBytes)
+		{
+			return g_Utf8ErrorCode_InvalidString;
+		}
+
+		bool secondByteValid = (string[cursor + 1] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
+		bool thirdByteValid = (string[cursor + 2] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
+		bool fourthByteValid = (string[cursor + 3] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
+		numOctets = 4;
+		pass = secondByteValid && thirdByteValid && fourthByteValid;
 	}
 
-	return numOctets;
+	if (pass)
+	{
+		return numOctets;
+	}
+
+	return g_Utf8ErrorCode_InvalidString;
 }
 
 #endif // GABE_CPP_STRINGS_IMPL
