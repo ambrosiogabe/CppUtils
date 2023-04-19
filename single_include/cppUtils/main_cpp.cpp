@@ -57,6 +57,8 @@ g_io_stream& operator<<(g_io_stream& io, const Vec2& vec)
 	return io;
 }
 
+#include <cppUtils/cppMaybe.hpp>
+
 // I'm purposely leaking memory and don't want to be warned to see if my
 // library catches it so we disable warnings about unreferenced vars
 #pragma warning( push )
@@ -123,13 +125,10 @@ void mainFunc()
 	{
 		g_logger_info("{}", "Hello World!");
 
-		g_DumbString string;
-		if (g_dumbString("Hello World!", &string) != g_Utf8ErrorCode_Success)
-		{
-			throw std::runtime_error("Failed to make UTF8 string");
-		}
-		g_logger_info("{}, {}", string, 2.3f);
-		g_dumbString_free(string);
+		auto string = g_dumbString("Hello World!");
+		g_DumbString& unboxedString = string.mut_value();
+		g_logger_info("{}, {}", unboxedString, 2.3f);
+		g_dumbString_free(unboxedString);
 
 		Vec2 vec2 = Vec2{ 0.3f, 2.1f };
 

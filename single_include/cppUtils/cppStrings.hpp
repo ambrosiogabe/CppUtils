@@ -70,6 +70,9 @@
 #define GABE_CPP_STRINGS_H
 
 #include <stdint.h>
+#include <cppUtils/cppMaybe.hpp>
+
+struct g_io_stream;
 
 // ----- Basic string data structures/constructors/destructors -----
 // Should always be UTF8-Encoded
@@ -93,12 +96,15 @@ enum g_Utf8ErrorCode
 	g_Utf8ErrorCode_InvalidString = 5,
 };
 
-g_Utf8ErrorCode g_dumbConstantString(const char* rawStringLiteral, g_DumbConstantString* output);
-g_Utf8ErrorCode g_dumbString(const char* rawString, g_DumbString* outputString);
+g_io_stream& operator<<(g_io_stream& io, g_Utf8ErrorCode error);
+
+g_Maybe<g_DumbConstantString, g_Utf8ErrorCode> g_dumbConstantString(const char* rawStringLiteral);
+g_Maybe<g_DumbString, g_Utf8ErrorCode> g_dumbString(const char* rawString);
+
 void g_dumbString_free(g_DumbString& string);
 
-g_Utf8ErrorCode g_dumbString_utf8Length(const char* rawString, size_t* outputLength);
-g_Utf8ErrorCode g_dumbString_utf8Length(const char* rawString, size_t rawStringNumBytes, size_t* outputLength);
+g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString);
+g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString, size_t rawStringNumBytes);
 
 bool operator==(const g_DumbString& a, const g_DumbString& b);
 bool operator==(const g_DumbConstantString& a, const g_DumbConstantString& b);
@@ -114,9 +120,9 @@ struct g_ParseInfo
 	size_t numBytes;
 };
 
-g_Utf8ErrorCode g_parser_makeParser(const char* rawString, size_t numBytes, g_ParseInfo* out);
-g_Utf8ErrorCode g_parser_makeParser(const char* rawString, g_ParseInfo* out);
-inline g_Utf8ErrorCode g_parser_makeParser(const g_DumbString& dumbString, g_ParseInfo* out) { return g_parser_makeParser((const char*)dumbString.data, dumbString.numBytes, out); }
+g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString, size_t numBytes);
+g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString);
+inline g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const g_DumbString& dumbString) { return g_parser_makeParser((const char*)dumbString.data, dumbString.numBytes); }
 
 uint32_t g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset = 0);
 uint32_t g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount = 0);
@@ -148,9 +154,24 @@ static constexpr uint8_t OCTET_EXTRA_BYTE_SHIFT_AMT = 6;
 
 // ------------- Internal Functions -------------
 static size_t getNumBytesTilNull(const char* rawString);
-static uint8_t getNumOctets(const uint8_t* rawString, size_t numBytes, size_t cursor);
+static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* rawString, size_t numBytes, size_t cursor);
 
-g_Utf8ErrorCode g_dumbString(const char* rawString, g_DumbString* outputString)
+g_io_stream& operator<<(g_io_stream& io, g_Utf8ErrorCode error)
+{
+	switch (error)
+	{
+	case g_Utf8ErrorCode_InvalidString:
+		io << "Invalid UTF8 String";
+		break;
+	case g_Utf8ErrorCode_Success:
+		io << "Success";
+		break;
+	}
+
+	return io;
+}
+
+g_Maybe<g_DumbString, g_Utf8ErrorCode> g_dumbString(const char* rawString)
 {
 	size_t numBytes = getNumBytesTilNull(rawString);
 	uint8_t* dumbString = (uint8_t*)g_memory_allocate((numBytes + 1) * sizeof(uint8_t));
@@ -158,28 +179,40 @@ g_Utf8ErrorCode g_dumbString(const char* rawString, g_DumbString* outputString)
 	g_memory_copyMem(dumbString, (void*)rawString, numBytes * sizeof(uint8_t));
 	dumbString[numBytes] = '\0';
 
-	*outputString = {
+	g_DumbString res = {
 		dumbString,
 		numBytes,
 		0
 	};
 
-	g_Utf8ErrorCode result = g_dumbString_utf8Length(rawString, &outputString->numCharacters);
-	return result;
+	g_Maybe<size_t, g_Utf8ErrorCode> numCharacters = g_dumbString_utf8Length(rawString);
+	if (numCharacters.hasValue())
+	{
+		res.numCharacters = numCharacters.mut_value();
+		return res;
+	}
+
+	return numCharacters.error();
 }
 
-g_Utf8ErrorCode g_dumbConstantString(const char* rawStringLiteral, g_DumbConstantString* outputString)
+g_Maybe<g_DumbConstantString, g_Utf8ErrorCode> g_dumbConstantString(const char* rawStringLiteral)
 {
 	size_t numBytes = getNumBytesTilNull(rawStringLiteral);
 	// Constant strings live through the lifetime of the program and don't need to be malloced
-	*outputString = {
+	g_DumbConstantString res = {
 		(const uint8_t*)rawStringLiteral,
 		numBytes,
 		0
 	};
 
-	g_Utf8ErrorCode result = g_dumbString_utf8Length(rawStringLiteral, &outputString->numCharacters);
-	return result;
+	g_Maybe<size_t, g_Utf8ErrorCode> numCharacters = g_dumbString_utf8Length(rawStringLiteral);
+	if (numCharacters.hasValue())
+	{
+		res.numCharacters = numCharacters.value();
+		return res;
+	}
+
+	return numCharacters.error();
 }
 
 void g_dumbString_free(g_DumbString& string)
@@ -188,31 +221,30 @@ void g_dumbString_free(g_DumbString& string)
 	g_memory_zeroMem(&string, sizeof(g_DumbString));
 }
 
-g_Utf8ErrorCode g_dumbString_utf8Length(const char* rawString, size_t numBytes, size_t* outputLength)
+g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString, size_t numBytes)
 {
 	// Count the number of characters in the string and also validate the UTF8 string
 	// along the way
-	*outputLength = 0;
+	size_t numCharacters = 0;
 	for (size_t i = 0; i < numBytes;)
 	{
-		uint8_t numOctets = getNumOctets((const uint8_t*)rawString, numBytes, i);
-		if (numOctets == g_Utf8ErrorCode_InvalidString)
+		auto numOctets = getNumOctets((const uint8_t*)rawString, numBytes, i);
+		if (!numOctets.hasValue())
 		{
-			*outputLength = 0;
-			return g_Utf8ErrorCode_InvalidString;
+			return numOctets.error();
 		}
 
-		*outputLength = *outputLength + 1;
-		i += numOctets;
+		numCharacters++;
+		i += numOctets.value();
 	}
 
-	return g_Utf8ErrorCode_Success;
+	return numCharacters;
 }
 
-g_Utf8ErrorCode g_dumbString_utf8Length(const char* rawString, size_t* outputLength)
+g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString)
 {
 	size_t numBytes = getNumBytesTilNull(rawString);
-	return g_dumbString_utf8Length(rawString, numBytes, outputLength);
+	return g_dumbString_utf8Length(rawString, numBytes);
 }
 
 bool operator==(const g_DumbString& a, const g_DumbString& b)
@@ -225,25 +257,26 @@ bool operator==(const g_DumbConstantString& a, const g_DumbConstantString& b)
 	return g_memory_compareMem((void*)a.rawStringLiteral, a.numBytes, (void*)b.rawStringLiteral, b.numBytes);
 }
 
-g_Utf8ErrorCode g_parser_makeParser(const char* rawString, size_t numBytes, g_ParseInfo* out)
+g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString, size_t numBytes)
 {
-	out->cursor = 0;
-	out->numBytes = numBytes;
-	out->utf8String = (const uint8_t*)rawString;
+	g_ParseInfo res;
+	res.cursor = 0;
+	res.numBytes = numBytes;
+	res.utf8String = (const uint8_t*)rawString;
 
 	// TODO: Validate the UTF8 string up front so that we can parse the string in safety
-	return g_Utf8ErrorCode_Success;
+	return res;
 }
 
-g_Utf8ErrorCode g_parser_makeParser(const char* rawString, g_ParseInfo* out)
+g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString)
 {
-	return g_parser_makeParser(rawString, getNumBytesTilNull(rawString), out);
+	return g_parser_makeParser(rawString, getNumBytesTilNull(rawString));
 }
 
 uint32_t g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset)
 {
-	uint8_t numOctets = getNumOctets(parseInfo.utf8String, parseInfo.numBytes, parseInfo.cursor + offset);
-	if (numOctets > 4)
+	auto numOctets = getNumOctets(parseInfo.utf8String, parseInfo.numBytes, parseInfo.cursor + offset);
+	if (!numOctets.hasValue())
 	{
 		throw std::runtime_error("Invalid UTF8 string somehow encountered during parsing. This means the validation of the UTF8 string failed for some reason.");
 	}
@@ -251,15 +284,15 @@ uint32_t g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed
 	uint32_t res = 0;
 	{
 		uint8_t bitMask = 0b0011'1111;
-		for (uint8_t i = numOctets - 1; i > 0; i--)
+		for (uint8_t i = *numOctets - 1; i > 0; i--)
 		{
 			uint8_t maskedBits = parseInfo.utf8String[parseInfo.cursor + i + offset] & bitMask;
-			uint8_t shiftAmt = (numOctets - i - 1) * 6;
+			uint8_t shiftAmt = (*numOctets - i - 1) * 6;
 			res = res | ((uint32_t)maskedBits << shiftAmt);
 		}
 	}
 
-	switch (numOctets)
+	switch (*numOctets)
 	{
 	case 1:
 	{
@@ -293,7 +326,7 @@ uint32_t g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed
 		throw std::runtime_error("Unknown number of octets hit while parsing a UTF8 string.");
 	}
 
-	*numBytesParsed = numOctets;
+	*numBytesParsed = *numOctets;
 	return res;
 }
 
@@ -333,7 +366,7 @@ static size_t getNumBytesTilNull(const char* rawString)
 	return i;
 }
 
-static uint8_t getNumOctets(const uint8_t* string, size_t numBytes, size_t cursor)
+static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, size_t numBytes, size_t cursor)
 {
 	if (cursor >= numBytes)
 	{

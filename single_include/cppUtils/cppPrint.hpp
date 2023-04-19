@@ -123,6 +123,7 @@
 #define GABE_CPP_PRINT_H
 
 #include <string>
+#include <cppUtils/cppMaybe.hpp>
 
 // Override this define to add DLL support on your platform
 #ifndef GABE_CPP_PRINT_API 
@@ -225,11 +226,25 @@ g_io_stream& operator<<(g_io_stream& io, char* const& s);
 template<std::size_t N>
 g_io_stream& operator<<(g_io_stream& io, g_io_sizedCharArray<N> const& s)
 {
-	_g_io_printf_internal((const char*)s, N);
+	// NOTE: N - 1 is because we don't want to count the null byte that ends the C-String
+	_g_io_print_string_formatted((const char*)s, N - 1, "", 0, io);
 	return io;
 }
 template<>
 g_io_stream& operator<<(g_io_stream& io, std::string const& str);
+template<typename T, typename E>
+g_io_stream& operator<<(g_io_stream& io, g_Maybe<T, E> const& maybeVal)
+{
+	if (maybeVal.hasValue())
+	{
+		io << maybeVal.value();
+	}
+	else
+	{
+		io << "<nullopt, error=" << maybeVal.error() << ">";
+	}
+	return io;
+}
 
 GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length);
 
@@ -371,12 +386,13 @@ static int32_t g_io_parseNextInteger(const char* str, size_t length, size_t* num
 void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 {
 	// format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
-	g_ParseInfo parseInfo;
-	g_Utf8ErrorCode res = g_parser_makeParser(modifiersStr, length, &parseInfo);
-	if (res != g_Utf8ErrorCode_Success)
+	auto maybeParseInfo = g_parser_makeParser(modifiersStr, length);;
+	if (!maybeParseInfo.hasValue())
 	{
 		throw std::runtime_error("Invalid UTF8 string passed to printf.");
 	}
+
+	g_ParseInfo& parseInfo = maybeParseInfo.mut_value();
 
 	// Parse [fill](":")
 	// Return early if end of string is reached with no specifiers
@@ -390,7 +406,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 			this->fillCharacter = 0;
 			for (size_t i = 0; i < numBytesParsed; i++)
 			{
-				this->fillCharacter = this->fillCharacter | 
+				this->fillCharacter = this->fillCharacter |
 					(parseInfo.utf8String[parseInfo.cursor + i] << ((numBytesParsed - i - 1) * 8));
 			}
 			parseInfo.cursor += numBytesParsed;
@@ -1048,12 +1064,12 @@ static void _g_io_print_string_formatted(const char* content, size_t contentLeng
 		_g_io_printf_internal(prefix, prefixLength);
 	}
 
-	size_t numCharsInContent;
-	if (g_dumbString_utf8Length(content, contentLength, &numCharsInContent) != g_Utf8ErrorCode_Success)
+	auto numCharsInContent = g_dumbString_utf8Length(content, contentLength);
+	if (!numCharsInContent.hasValue())
 	{
 		throw std::runtime_error("Tried to print invalid UTF8 string in printf.");
 	}
-	size_t totalContentLength = prefixLength + numCharsInContent;
+	size_t totalContentLength = prefixLength + numCharsInContent.value();
 	uint32_t leftPadding = 0;
 	uint32_t rightPadding = 0;
 	if (io.width != 0)

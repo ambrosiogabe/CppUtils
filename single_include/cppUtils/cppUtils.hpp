@@ -288,7 +288,7 @@ GABE_CPP_UTILS_API void _g_logger_printPreamble(const char* filename, int line, 
 GABE_CPP_UTILS_API void _g_logger_printPostamble(const char* filename, int line, char* buf, size_t bufSize);
 
 template<typename...Args>
-GABE_CPP_UTILS_API void _g_logger_gabeCommonPrint(const char* filename, int line, g_logger_level level, WORD color, const char* format, Args... args)
+GABE_CPP_UTILS_API void _g_logger_gabeCommonPrint(const char* filename, int line, g_logger_level level, WORD color, const char* format, const Args&... args)
 {
 	if (g_logger_get_level() <= level)
 	{
