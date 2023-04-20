@@ -102,16 +102,28 @@ namespace String {
 Maybe<ConstantString, Utf8ErrorCode> makeConstantString(const char* rawStringLiteral);
 Maybe<BasicString, Utf8ErrorCode> makeString(const char* rawString);
 
+inline Maybe<ConstantString, Utf8ErrorCode> makeConstantString(const uint8_t* rawString) { return makeConstantString((const char*)rawString); }
+inline Maybe<BasicString, Utf8ErrorCode> makeString(const uint8_t* rawString) { return makeString((const char*)rawString); }
+
 void free(Maybe<BasicString, Utf8ErrorCode>& string);
 void free(BasicString& string);
 
 Maybe<size_t, Utf8ErrorCode> utf8Length(const char* rawString);
 Maybe<size_t, Utf8ErrorCode> utf8Length(const char* rawString, size_t rawStringNumBytes);
 
-bool operator==(const BasicString& a, const BasicString& b);
-bool operator==(const ConstantString& a, const ConstantString& b);
+} } // End CppUtils::String
 
-} // End String
+bool operator==(const CppUtils::BasicString& a, const CppUtils::BasicString& b);
+bool operator==(const CppUtils::ConstantString& a, const CppUtils::ConstantString& b);
+bool operator==(const CppUtils::BasicString& a, const CppUtils::ConstantString& b);
+inline bool operator==(const CppUtils::ConstantString& a, const CppUtils::BasicString& b) { return b == a; }
+
+inline bool operator!=(const CppUtils::BasicString& a, const CppUtils::BasicString& b) { return !(a == b); }
+inline bool operator!=(const CppUtils::ConstantString& a, const CppUtils::ConstantString& b) { return !(a == b); }
+inline bool operator!=(const CppUtils::BasicString& a, const CppUtils::ConstantString& b) { return !(a == b); }
+inline bool operator!=(const CppUtils::ConstantString& a, const CppUtils::BasicString& b) { return !(b == a); }
+
+namespace CppUtils {
 
 // ----- Parsing helpers -----
 // NOTE: This data structure is NON-OWNING, so it will not make a copy of the string
@@ -252,6 +264,8 @@ Maybe<size_t, Utf8ErrorCode> utf8Length(const char* rawString)
 	return utf8Length(rawString, numBytes);
 }
 
+} } // End CppUtils::String
+
 bool operator==(const BasicString& a, const BasicString& b)
 {
 	return g_memory_compareMem(a.data, a.numBytes, b.data, b.numBytes);
@@ -261,6 +275,13 @@ bool operator==(const ConstantString& a, const ConstantString& b)
 {
 	return g_memory_compareMem((void*)a.rawStringLiteral, a.numBytes, (void*)b.rawStringLiteral, b.numBytes);
 }
+
+bool operator==(const BasicString& a, const ConstantString& b)
+{
+	return g_memory_compareMem((void*)a.data, a.numBytes, (void*)b.rawStringLiteral, b.numBytes);
+}
+
+namespace CppUtils { namespace String {
 
 // ------------- Internal Functions -------------
 static size_t getNumBytesTilNull(const char* rawString)

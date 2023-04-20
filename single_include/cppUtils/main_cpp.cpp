@@ -17,23 +17,78 @@ using namespace CppUtils;
 #include <cppUtils/cppMaybe.hpp>
 
 // -------------------- Tests --------------------
-DEFINE_TEST(dummyOne)
+DEFINE_TEST(utf8String_C080_ShouldBeBad)
 {
+	const uint8_t invalidUtf8Data[] = { 0xc0, 0x80, 0x00 };
+	auto badString = String::makeString((const char*)invalidUtf8Data);
+
+	ASSERT_FALSE(badString.hasValue());
+	ASSERT_EQUAL(badString.error(), Utf8ErrorCode::InvalidString)
+
+	// NOTE: This is unnecessary since the string won't allocate if it's an invalid UTF8 string
+	//       but it's nice in case you're not checking for that type of stuff and just want to
+	//       pass the data forwards whether it's valid or not
+	String::free(badString);
+
 	END_TEST;
 }
 
-DEFINE_TEST(dummyTwo)
+DEFINE_TEST(utf8String_EDA18CEDBEB4_ShouldBeBad)
 {
-	ASSERT_FALSE(true);
+	const uint8_t invalidUtf8Data[] = { 0xED, 0xA1, 0x8C, 0xED, 0xBE, 0xB4 };
+	auto badString = String::makeString((const char*)invalidUtf8Data);
+
+	ASSERT_FALSE(badString.hasValue());
+	ASSERT_EQUAL(badString.error(), Utf8ErrorCode::InvalidString)
+
 	END_TEST;
 }
 
-void setupCppPrintTestSuite()
+DEFINE_TEST(validUtf8String_ShouldSucceed)
 {
-	Tests::TestSuite& testSuite = Tests::addTestSuite("cppPrint.hpp");
+	const char rawStringLiteral[] = u8"Hello World!";
+	auto maybeString = String::makeString(rawStringLiteral);
 
-	ADD_TEST(testSuite, dummyOne);
-	ADD_TEST(testSuite, dummyTwo);
+	ASSERT_TRUE(maybeString.hasValue());
+
+	const BasicString& string = maybeString.value();
+
+	ASSERT_EQUAL(string.numCharacters, sizeof(rawStringLiteral) - 1);
+	ASSERT_EQUAL(string.numBytes, sizeof(rawStringLiteral) - 1);
+	ASSERT_EQUAL(string, String::makeConstantString("Hello World!").value());
+
+	String::free(maybeString.mut_value());
+
+	END_TEST;
+}
+
+DEFINE_TEST(validUtf8String_ShouldSucceedWithUnicodeChars)
+{
+	const uint32 numCharacters = 29;
+	const char rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
+	auto maybeString = String::makeString(rawStringLiteral);
+
+	ASSERT_TRUE(maybeString.hasValue());
+
+	const BasicString& string = maybeString.value();
+
+	ASSERT_EQUAL(string.numCharacters, numCharacters);
+	ASSERT_EQUAL(string.numBytes, sizeof(rawStringLiteral) - 1);
+	ASSERT_EQUAL(string, String::makeConstantString(u8"\u220f Test some unicode strings \u220f").value());
+
+	String::free(maybeString.mut_value());
+
+	END_TEST;
+}
+
+void setupCppStringsTestSuite()
+{
+	Tests::TestSuite& testSuite = Tests::addTestSuite("cppStrings.hpp");
+
+	ADD_TEST(testSuite, utf8String_C080_ShouldBeBad);
+	ADD_TEST(testSuite, utf8String_EDA18CEDBEB4_ShouldBeBad);
+	ADD_TEST(testSuite, validUtf8String_ShouldSucceed);
+	ADD_TEST(testSuite, validUtf8String_ShouldSucceedWithUnicodeChars);
 }
 
 // I'm purposely leaking memory and don't want to be warned to see if my
@@ -48,7 +103,7 @@ void mainFunc()
 	g_memory_init_padding(true, 1024);
 
 
-	setupCppPrintTestSuite();
+	setupCppStringsTestSuite();
 
 	Tests::runTests();
 	Tests::free();
@@ -107,24 +162,6 @@ void mainFunc()
 	if (testingCppPrint)
 	{
 		g_logger_info("{}", "Hello World!");
-
-		const uint8_t invalidUtf8Data[] = { 0xc0, 0x80, 0x00 };
-		auto badString = String::makeString((const char*)invalidUtf8Data);
-		g_logger_info("{}", badString);
-		// NOTE: This is unnecessary since the string won't allocate if it's an invalid UTF8 string
-		//       but it's nice in case you're not checking for that type of stuff and just want to
-		//       pass the data forwards whether it's valid or not
-		String::free(badString);
-
-		const uint8_t moreInvalidUtf8Data[] = { 0xED, 0xA1, 0x8C, 0xED, 0xBE, 0xB4 };
-		auto anotherBadString = String::makeString((const char*)moreInvalidUtf8Data);
-		g_logger_info("{}", anotherBadString);
-		String::free(anotherBadString);
-
-		auto string = String::makeString(u8"Hello World!");
-		BasicString& unboxedString = string.mut_value();
-		g_logger_info("{}, {}", unboxedString, 2.3f);
-		String::free(unboxedString);
 
 		g_logger_info("Pi: {}", 3.14f);
 		g_logger_warning("Warning: {}", "Raw string literal");
