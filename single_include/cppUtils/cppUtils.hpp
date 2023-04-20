@@ -249,7 +249,7 @@ const WORD g_logger_BACKGROUND_RED = 0x0040; // background color contains red.
 #else 
 #error "Unsupported platform for logging."
 #endif
-#endif // USE_GABE_CPP_PRINT
+#endif // #ifndef USE_GABE_CPP_PRINT
 
 	GABE_CPP_UTILS_API void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...);
 
@@ -287,11 +287,11 @@ const WORD g_logger_BACKGROUND_RED = 0x0040; // background color contains red.
 
 #ifdef _WIN32
 
-GABE_CPP_UTILS_API void _g_logger_printPreamble(const char* filename, int line, char* buf, size_t bufSize, WORD color);
+GABE_CPP_UTILS_API void _g_logger_printPreamble(const char* filename, int line, char* buf, size_t bufSize, CppUtils::ConsoleColor color);
 GABE_CPP_UTILS_API void _g_logger_printPostamble(const char* filename, int line, char* buf, size_t bufSize);
 
 template<typename...Args>
-GABE_CPP_UTILS_API void _g_logger_gabeCommonPrint(const char* filename, int line, g_logger_level level, WORD color, const char* format, const Args&... args)
+GABE_CPP_UTILS_API void _g_logger_gabeCommonPrint(const char* filename, int line, g_logger_level level, CppUtils::ConsoleColor color, const char* format, const Args&... args)
 {
 	if (g_logger_get_level() <= level)
 	{
@@ -321,10 +321,10 @@ GABE_CPP_UTILS_API void _g_logger_gabeAssert(const char* filename, int line, boo
 }
 
 #define VA_ARGS(...) , ##__VA_ARGS__
-#define g_logger_log(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Log, g_logger_FOREGROUND_BLUE | g_logger_FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
-#define g_logger_info(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Info, g_logger_FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
-#define g_logger_warning(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Warning, g_logger_FOREGROUND_GREEN | g_logger_FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
-#define g_logger_error(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Error, g_logger_FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
+#define g_logger_log(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Log, CppUtils::ConsoleColor::CYAN, format VA_ARGS(__VA_ARGS__))
+#define g_logger_info(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Info, CppUtils::ConsoleColor::GREEN, format VA_ARGS(__VA_ARGS__))
+#define g_logger_warning(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Warning, CppUtils::ConsoleColor::YELLOW, format VA_ARGS(__VA_ARGS__))
+#define g_logger_error(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Error, CppUtils::ConsoleColor::RED, format VA_ARGS(__VA_ARGS__))
 #define g_logger_assert(condition, format, ...) _g_logger_gabeAssert(__FILE__, __LINE__, condition, format, __VA_ARGS__)
 
 #endif // _WIN32
@@ -844,19 +844,19 @@ void g_logger_set_log_directory(const char* directory)
 
 
 // ----------------------------------------
-// Logging Implementation OS specific C++
+// Logging Implementation OS specific C++/C
 // ----------------------------------------
 #ifdef _WIN32
 #ifdef USE_GABE_CPP_PRINT
 using namespace CppUtils;
 
-void _g_logger_printPreamble(const char* filename, int line, char* buf, size_t bufSize, WORD color)
+void _g_logger_printPreamble(const char* filename, int line, char* buf, size_t bufSize, CppUtils::ConsoleColor color)
 {
 	g_thread_lockMutex(logMutex);
 
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+	IO::setForegroundColor(color);
 	IO::printf("{} (line {}) Log: \n", filename, line);
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
+	IO::resetColor();
 
 	time_t now;
 	time(&now);
@@ -891,9 +891,9 @@ void _g_logger_assertGabePreamble(const char* filename, int line, char* buf, siz
 {
 	g_thread_lockMutex(logMutex);
 
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), g_logger_FOREGROUND_RED);
+	IO::setForegroundColor(CppUtils::ConsoleColor::DARKRED);
 	IO::printf("{} (line {}) Assertion Failure: \n", filename, line);
-	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
+	IO::resetColor();
 
 	time_t now;
 	time(&now);
@@ -999,9 +999,13 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 			);
 			offset = strlen(fullErrorMessageBuffer);
 
-			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), g_logger_FOREGROUND_RED);
+			auto csbi = CONSOLE_SCREEN_BUFFER_INFO{};
+			HANDLE console = GetStdHandle(STD_OUTPUT_HANDLE);
+			WORD backgroundColor = csbi.wAttributes & 0xF0;
+
+			SetConsoleTextAttribute(console, g_logger_FOREGROUND_RED | backgroundColor);
 			printf("%s (line %d) Assertion Failure: \n", filename, line);
-			SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
+			SetConsoleTextAttribute(console, csbi.wAttributes);
 
 			time_t now;
 			time(&now);

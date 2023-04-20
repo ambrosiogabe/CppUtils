@@ -25,10 +25,10 @@ DEFINE_TEST(utf8String_C080_ShouldBeBad)
 	ASSERT_FALSE(badString.hasValue());
 	ASSERT_EQUAL(badString.error(), Utf8ErrorCode::InvalidString)
 
-	// NOTE: This is unnecessary since the string won't allocate if it's an invalid UTF8 string
-	//       but it's nice in case you're not checking for that type of stuff and just want to
-	//       pass the data forwards whether it's valid or not
-	String::free(badString);
+		// NOTE: This is unnecessary since the string won't allocate if it's an invalid UTF8 string
+		//       but it's nice in case you're not checking for that type of stuff and just want to
+		//       pass the data forwards whether it's valid or not
+		String::free(badString);
 
 	END_TEST;
 }
@@ -41,7 +41,7 @@ DEFINE_TEST(utf8String_EDA18CEDBEB4_ShouldBeBad)
 	ASSERT_FALSE(badString.hasValue());
 	ASSERT_EQUAL(badString.error(), Utf8ErrorCode::InvalidString)
 
-	END_TEST;
+		END_TEST;
 }
 
 DEFINE_TEST(validUtf8String_ShouldSucceed)
@@ -107,6 +107,8 @@ void mainFunc()
 
 	Tests::runTests();
 	Tests::free();
+
+	IO::setBackgroundColor(ConsoleColor::BLACK);
 
 	constexpr bool testingCppUtils = false;
 	constexpr bool testingCppPrint = true;
@@ -252,6 +254,25 @@ void mainFunc()
 			u8"     small-phi: \u03C6 \n"
 			u8"special-quotes: \u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B \n"
 			u8"        arrows: \u2192 \u2190 \u2191 \u2193 \u2194 \u2195");
+	}
+
+	// Trying all the colors
+	for (int i = (int)ConsoleColor::BLACK; i < (int)ConsoleColor::WHITE; i++)
+	{
+		if (i <= (int)ConsoleColor::DARKGRAY)
+		{
+			IO::printf("{:>2}: ", i);
+			IO::setColor((ConsoleColor)i, (ConsoleColor)(i + 8));
+			IO::printf("I am the color {}", (ConsoleColor)i);
+			IO::resetColor();
+			IO::printf("\n");
+		}
+
+		IO::printf("{:>2}: ", i);
+		IO::setForegroundColor((ConsoleColor)i);
+		IO::printf("I am the color {}", (ConsoleColor)i);
+		IO::resetColor();
+		IO::printf("\n");
 	}
 
 	g_memory_dumpMemoryLeaks();

@@ -15,7 +15,10 @@
 #define DEFINE_TEST(fnName) const char* fnName()
 #define END_TEST return nullptr
 
-namespace CppUtils { namespace Tests {
+namespace CppUtils
+{
+namespace Tests
+{
 
 struct TestSuite;
 typedef const char* (*TestFn)();
@@ -28,7 +31,8 @@ void runTests();
 
 void free();
 
-} } // End namespace CppUtils::Tests
+}
+} // End namespace CppUtils::Tests
 
 #endif // GABE_CPP_UTILS_TESTS_H
 
@@ -42,16 +46,10 @@ void free();
 #include "cppUtils/cppPrint.hpp"
 #define GABE_CPP_UTILS_IMPL
 
-// See here for more escape code colors https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
-#define ANSI_COLOR_RED     "\u001b[38;5;167m"
-#define ANSI_COLOR_GREEN   "\u001b[38;5;84m"
-#define ANSI_COLOR_YELLOW  "\u001b[38;5;220m"
-#define ANSI_COLOR_BLUE    "\u001b[34m"
-#define ANSI_COLOR_MAGENTA "\u001b[35m"
-#define ANSI_COLOR_CYAN    "\u001b[36m"
-#define ANSI_COLOR_RESET   "\u001b[0m"
-
-namespace CppUtils { namespace Tests {
+namespace CppUtils
+{
+namespace Tests
+{
 
 // ----------------- Internal structures -----------------
 struct TestPrototype
@@ -152,13 +150,23 @@ void runTests()
 		}
 	}
 
-	IO::printf("\n  Number of Test Suites Passed "
-		ANSI_COLOR_YELLOW
-		"{}/{}\n\n"
-		ANSI_COLOR_RESET,
+
+	IO::printf("\n  Number of Test Suites Passed ");
+
+	if (numTestSuitesPassed == testSuites.size())
+	{
+		IO::setForegroundColor(ConsoleColor::GREEN);
+	}
+	else
+	{
+		IO::setForegroundColor(ConsoleColor::RED);
+	}
+
+	IO::printf("{}/{}\n\n",
 		numTestSuitesPassed,
 		testSuites.size()
 	);
+	IO::resetColor();
 }
 
 void free()
@@ -236,63 +244,49 @@ static void printTestSuiteResCallback(void* testSuiteRaw, size_t testSuiteSize)
 	{
 		if (testSuite->testResults[i] == nullptr)
 		{
-			IO::printf(
-				ANSI_COLOR_GREEN
-				u8"      \u2713 Success "
-				ANSI_COLOR_RESET
-				"'{}::{}'\n",
-				testSuite->name,
-				testSuite->tests[i].name
-			);
+			IO::setForegroundColor(ConsoleColor::GREEN);
+			IO::printf(u8"      \u2713 Success ");
+			IO::resetColor();
+			IO::printf("'{}::{}'\n", testSuite->name, testSuite->tests[i].name);
 		}
 		else
 		{
-			IO::printf(
-				ANSI_COLOR_RED
-				u8"      \u0078 Fail    "
-				ANSI_COLOR_RESET
-				"'{}::{}'\n"
-				"        Failed at: "
-				ANSI_COLOR_RED
-				"{}\n"
-				ANSI_COLOR_RESET,
+			IO::setForegroundColor(ConsoleColor::RED);
+			IO::printf(u8"      \u0078 Fail    ");
+			IO::resetColor();
+			IO::printf("'{}::{}'\n"
+				"        Failed at: ",
 				testSuite->name,
-				testSuite->tests[i].name,
-				testSuite->testResults[i]
+				testSuite->tests[i].name
 			);
+			IO::setForegroundColor(ConsoleColor::RED);
+			IO::printf("{}\n", testSuite->testResults[i]);
+			IO::resetColor();
 		}
 	}
 
 	if (testSuite->numTestsPassed < testSuite->testsLength)
 	{
-		IO::printf(
-			ANSI_COLOR_RED
-			"\n    Suite Fail "
-			ANSI_COLOR_RESET
-			"'{}'",
-			testSuite->name
-		);
+		IO::setForegroundColor(ConsoleColor::RED);
+		IO::printf("\n    Suite Fail ");
+		IO::resetColor();
+		IO::printf("'{}'", testSuite->name);
 	}
 	else
 	{
-		IO::printf(
-			ANSI_COLOR_GREEN
-			"\n    Suite Success "
-			ANSI_COLOR_RESET
-			"'{}'",
-			testSuite->name
-		);
+		IO::setForegroundColor(ConsoleColor::GREEN);
+		IO::printf("\n    Suite Success ");
+		IO::resetColor();
+		IO::printf("'{}'", testSuite->name);
 	}
 
-	IO::printf("\n    Number of Tests Passed "
-		ANSI_COLOR_YELLOW
-		"{}/{}\n\n"
-		ANSI_COLOR_RESET,
-		testSuite->numTestsPassed,
-		testSuite->testsLength
-	);
+	IO::printf("\n    Number of Tests Passed ");
+	IO::setForegroundColor(ConsoleColor::YELLOW);
+	IO::printf("{}/{}\n\n", testSuite->numTestsPassed, testSuite->testsLength);
+	IO::resetColor();
 }
 
-} } // End namespace CppUtils::Tests
+}
+} // End namespace CppUtils::Tests
 
 #endif 

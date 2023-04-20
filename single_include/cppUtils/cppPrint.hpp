@@ -140,7 +140,8 @@ namespace CppUtils { struct Stream; }
 template<typename T>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, T const& t);
 
-namespace CppUtils { 
+namespace CppUtils
+{
 
 struct BasicString;
 
@@ -196,6 +197,26 @@ struct Stream
 	void resetModifiers();
 };
 
+enum ConsoleColor
+{
+	BLACK,
+	DARKBLUE,
+	DARKGREEN,
+	DARKCYAN,
+	DARKRED,
+	DARKMAGENTA,
+	DARKYELLOW,
+	DARKGRAY,
+	GRAY,
+	BLUE,
+	GREEN,
+	CYAN,
+	RED,
+	MAGENTA,
+	YELLOW,
+	WHITE,
+};
+
 namespace IO
 {
 
@@ -205,6 +226,11 @@ GABE_CPP_PRINT_API void _printfInternal(const char* s, size_t length);
 GABE_CPP_PRINT_API void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io);
 
 GABE_CPP_PRINT_API void printf(const char* s);
+
+GABE_CPP_PRINT_API void setColor(ConsoleColor background, ConsoleColor foreground);
+GABE_CPP_PRINT_API void setBackgroundColor(ConsoleColor background);
+GABE_CPP_PRINT_API void setForegroundColor(ConsoleColor foreground);
+GABE_CPP_PRINT_API void resetColor();
 
 template<typename T, typename...Args>
 GABE_CPP_PRINT_API void _printfInternal(const char* s, size_t length, const T& value, const Args&... args)
@@ -275,7 +301,8 @@ GABE_CPP_PRINT_API void printf(const char* s, const T& value, const Args&... arg
 	_printfInternal(s, strLength, value, args...);
 }
 
-} } // End CppUtils::io
+}
+} // End CppUtils::io
 
 // Helper for raw string literals and char[N] arrays
 template<std::size_t N>
@@ -332,6 +359,8 @@ CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Maybe<T, E> const& 
 	}
 	return io;
 }
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::ConsoleColor const& color);
 
 #endif // GABE_CPP_PRINT_H
 
@@ -342,7 +371,10 @@ CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Maybe<T, E> const& 
 #include <cppUtils/cppStrings.hpp>
 #define GABE_CPP_UTILS_IMPL
 
-namespace CppUtils { namespace IO {
+namespace CppUtils
+{
+namespace IO
+{
 // -------------------- Common --------------------
 
 // ------ Internal variables ------
@@ -1076,6 +1108,67 @@ Stream& operator<<(Stream& io, BasicString const& dumbString)
 }
 
 template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::ConsoleColor const& color)
+{
+	switch (color)
+	{
+	case BLACK:
+		io << "<Black>";
+		break;
+	case DARKBLUE:
+		io << "<DarkBlue>";
+		break;
+	case DARKGREEN:
+		io << "<DarkGreen>";
+		break;
+	case DARKCYAN:
+		io << "<DarkCyan>";
+		break;
+	case DARKRED:
+		io << "<DarkRed>";
+		break;
+	case DARKMAGENTA:
+		io << "<DarkMagenta>";
+		break;
+	case DARKYELLOW:
+		io << "<DarkYellow>";
+		break;
+	case DARKGRAY:
+		io << "<DarkGray>";
+		break;
+	case GRAY:
+		io << "<Gray>";
+		break;
+	case BLUE:
+		io << "<Blue>";
+		break;
+	case GREEN:
+		io << "<Green>";
+		break;
+	case CYAN:
+		io << "<Cyan>";
+		break;
+	case RED:
+		io << "<Red>";
+		break;
+	case MAGENTA:
+		io << "<Magenta>";
+		break;
+	case YELLOW:
+		io << "<Yellow>";
+		break;
+	case WHITE:
+		io << "<White>";
+		break;
+	default:
+		io << "<UnknownConsoleColor>";
+		break;
+	}
+
+	return io;
+}
+
+template<>
 Stream& operator<<(Stream& io, const char* const& s)
 {
 	IO::printFormattedString((const char*)s, std::strlen((const char*)s), "", 0, io);
@@ -1103,7 +1196,10 @@ Stream& operator<<(Stream& io, std::string const& str)
 	return io;
 }
 
-namespace CppUtils { namespace IO {
+namespace CppUtils
+{
+namespace IO
+{
 
 // ------ Internal functions ------
 static const char* getIntPrefix(const Stream& io)
@@ -1214,18 +1310,103 @@ static int32_t parseNextInteger(const char* str, size_t length, size_t* numChara
 	return result;
 }
 
-} } // End CppUtils::io
+}
+} // End CppUtils::io
 
 // -------------------- Platform --------------------
 #ifdef _WIN32
 
 #include <Windows.h>
 
-namespace CppUtils { namespace IO {
+namespace CppUtils
+{
+namespace IO
+{
 
 static HANDLE stdoutHandle = NULL;
 static bool writingDirectlyToConsole = false;
 static constexpr int fontExistCode = 3;
+static CONSOLE_SCREEN_BUFFER_INFOEX originalConsoleInfo = {};
+
+static WORD consoleColorToForegroundColor(ConsoleColor color)
+{
+	switch (color)
+	{
+	case BLACK:
+		return 0;
+	case DARKBLUE:
+		return FOREGROUND_BLUE;
+	case DARKGREEN:
+		return FOREGROUND_GREEN;
+	case DARKCYAN:
+		return FOREGROUND_GREEN | FOREGROUND_BLUE;
+	case DARKRED:
+		return FOREGROUND_RED;
+	case DARKMAGENTA:
+		return FOREGROUND_RED | FOREGROUND_BLUE;
+	case DARKYELLOW:
+		return FOREGROUND_RED | FOREGROUND_GREEN;
+	case DARKGRAY:
+		return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+	case GRAY:
+		return FOREGROUND_INTENSITY;
+	case BLUE:
+		return FOREGROUND_INTENSITY | FOREGROUND_BLUE;
+	case GREEN:
+		return FOREGROUND_INTENSITY | FOREGROUND_GREEN;
+	case CYAN:
+		return FOREGROUND_INTENSITY | FOREGROUND_GREEN | FOREGROUND_BLUE;
+	case RED:
+		return FOREGROUND_INTENSITY | FOREGROUND_RED;
+	case MAGENTA:
+		return FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_BLUE;
+	case YELLOW:
+		return FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN;
+	case WHITE:
+	default:
+		return FOREGROUND_INTENSITY | FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+	}
+}
+
+static WORD consoleColorToBackgroundColor(ConsoleColor color)
+{
+	switch (color)
+	{
+	case BLACK:
+		return 0;
+	case DARKBLUE:
+		return BACKGROUND_BLUE;
+	case DARKGREEN:
+		return BACKGROUND_GREEN;
+	case DARKCYAN:
+		return BACKGROUND_GREEN | BACKGROUND_BLUE;
+	case DARKRED:
+		return BACKGROUND_RED;
+	case DARKMAGENTA:
+		return BACKGROUND_RED | BACKGROUND_BLUE;
+	case DARKYELLOW:
+		return BACKGROUND_RED | BACKGROUND_GREEN;
+	case DARKGRAY:
+		return BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE;
+	case GRAY:
+		return BACKGROUND_INTENSITY;
+	case BLUE:
+		return BACKGROUND_INTENSITY | BACKGROUND_BLUE;
+	case GREEN:
+		return BACKGROUND_INTENSITY | BACKGROUND_GREEN;
+	case CYAN:
+		return BACKGROUND_INTENSITY | BACKGROUND_GREEN | BACKGROUND_BLUE;
+	case RED:
+		return BACKGROUND_INTENSITY | BACKGROUND_RED;
+	case MAGENTA:
+		return BACKGROUND_INTENSITY | BACKGROUND_RED | BACKGROUND_BLUE;
+	case YELLOW:
+		return BACKGROUND_INTENSITY | BACKGROUND_RED | BACKGROUND_GREEN;
+	case WHITE:
+	default:
+		return BACKGROUND_INTENSITY | BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE;
+	}
+}
 
 int CALLBACK win32FontExistsCallback(const LOGFONTW*, const TEXTMETRICW*, DWORD, LPARAM)
 {
@@ -1245,6 +1426,36 @@ static void initializeStdoutIfNecessary()
 		{
 			// Running on a device with no dedicated stdout, just pipe the output nowhere in this case
 			throw std::runtime_error("Cannot acquire a STD_OUTPUT_HANDLE. Current device does not support stdout.");
+		}
+
+		// Get original console info in case we need to reset colors
+		{
+			originalConsoleInfo = {};
+			originalConsoleInfo.cbSize = sizeof(CONSOLE_SCREEN_BUFFER_INFOEX);
+			GetConsoleScreenBufferInfoEx(stdoutHandle, &originalConsoleInfo);
+
+			// Setup a nicer color palette
+			originalConsoleInfo.ColorTable[0]  = 0x00'05'05'05; // Black
+			originalConsoleInfo.ColorTable[1]  = 0x00'99'37'2E; // Dark Blue
+			originalConsoleInfo.ColorTable[2]  = 0x00'37'8A'2C; // Dark Green
+			originalConsoleInfo.ColorTable[3]  = 0x00'A3'99'2C; // Dark Cyan
+			originalConsoleInfo.ColorTable[4]  = 0x00'24'2C'85; // Dark Red
+			originalConsoleInfo.ColorTable[5]  = 0x00'56'24'01; // Dark Magenta (Powershell Blue)
+			originalConsoleInfo.ColorTable[6]  = 0x00'2B'B1'BD; // Dark Yellow
+			originalConsoleInfo.ColorTable[7]  = 0x00'61'61'61; // Dark Gray
+			originalConsoleInfo.ColorTable[8]  = 0x00'B0'B0'B0; // Gray
+			originalConsoleInfo.ColorTable[9]  = 0x00'EB'83'5E; // Blue
+			originalConsoleInfo.ColorTable[10] = 0x00'5E'CC'67; // Green
+			originalConsoleInfo.ColorTable[11] = 0x00'DE'DC'66; // Cyan
+			originalConsoleInfo.ColorTable[12] = 0x00'66'70'DE; // Red
+			originalConsoleInfo.ColorTable[13] = 0x00'E6'67'B3; // Magenta
+			originalConsoleInfo.ColorTable[14] = 0x00'72'EC'F2; // Yellow
+			originalConsoleInfo.ColorTable[15] = 0x00'FF'FF'FF; // White
+
+			WORD backgroundColor = originalConsoleInfo.wAttributes & 0xF0;
+			originalConsoleInfo.wAttributes = backgroundColor | consoleColorToForegroundColor(ConsoleColor::WHITE);
+
+			SetConsoleScreenBufferInfoEx(stdoutHandle, &originalConsoleInfo);
 		}
 
 		// Are we printing to the console or redirecting through a pipe?
@@ -1274,6 +1485,7 @@ static void initializeStdoutIfNecessary()
 			constexpr wchar_t* fontsToTry[maxFallbackFonts] = {
 				L"Cascadia Mono",
 				L"Cascadia Code",
+				L"Lucida Console",
 				L"Consolas",
 				L"NSimSun"
 			};
@@ -1304,6 +1516,32 @@ static void initializeStdoutIfNecessary()
 		// TODO: If we're not writing directly to console then check if the file we are writing to is
 		//       new. If it is new, then write the BOM prefix for the file to specify this is UTF-8.
 	}
+}
+
+void setColor(ConsoleColor background, ConsoleColor foreground)
+{
+	WORD backgroundColor = consoleColorToBackgroundColor(background);
+	WORD foregroundColor = consoleColorToForegroundColor(foreground);
+	SetConsoleTextAttribute(stdoutHandle, backgroundColor | foregroundColor);
+}
+
+void setBackgroundColor(ConsoleColor background)
+{
+	WORD foregroundColor = originalConsoleInfo.wAttributes & 0xF;
+	WORD color = consoleColorToBackgroundColor(background);
+	SetConsoleTextAttribute(stdoutHandle, color | foregroundColor);
+}
+
+void setForegroundColor(ConsoleColor foreground)
+{
+	WORD backgroundColor = originalConsoleInfo.wAttributes & 0xF0;
+	WORD color = consoleColorToForegroundColor(foreground);
+	SetConsoleTextAttribute(stdoutHandle, color | backgroundColor);
+}
+
+void resetColor()
+{
+	SetConsoleTextAttribute(stdoutHandle, originalConsoleInfo.wAttributes);
 }
 
 void printf(const char* s)
@@ -1446,11 +1684,15 @@ void printFormattedString(const char* content, size_t contentLength, const char*
 	}
 }
 
-} } // End CppUtils::io
+}
+} // End CppUtils::io
 
 #else // end _WIN32
 
-namespace CppUtils { namespace IO {
+namespace CppUtils
+{
+namespace IO
+{
 
 void printf(const char* s)
 {
@@ -1470,7 +1712,8 @@ void _printfInternal(const char* s, size_t length)
 	}
 }
 
-} } // End CppUtils::io
+}
+} // End CppUtils::io
 
 #endif // end PLATFORM_IMPLS
 
