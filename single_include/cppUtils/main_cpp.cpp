@@ -5,59 +5,36 @@
 // this single_include file.
 // ===================================================================================
 #ifdef GABE_CPP_UTILS_TEST_MAIN
-#define GABE_CPP_PRINT_IMPL
+
+#define GABE_CPP_UTILS_IMPL
 #include <cppUtils/cppPrint.hpp>
-#undef GABE_CPP_PRINT_IMPL
-
 #include <cppUtils/cppUtils.hpp>
-
-#ifdef GABE_CPP_UTILS_IMPL
-#undef GABE_CPP_UTILS_IMPL
-#endif
-
-#define GABE_CPP_STRINGS_IMPL
+#include <cppUtils/cppTests.hpp>
 #include <cppUtils/cppStrings.hpp>
 
-#include <array>
-#include <thread>
-#include <string>
-#include <iostream>
-
-void threadLogger(const char* threadName)
-{
-	for (int i = 0; i < 10; i++)
-	{
-		//g_logger_info("%s[i]: %d", threadName, i);
-		g_logger_info("{}[i]: {}", threadName, i);
-	}
-}
-
-struct Vec2
-{
-	float x;
-	float y;
-};
-
-struct UnknownStruct
-{
-	float foo;
-	int bar;
-	const char* string;
-};
-
-g_io_stream& operator<<(g_io_stream& io, const UnknownStruct& foo)
-{
-	io << "<Foo: " << foo.foo << ", bar: " << foo.bar << ", string: " << foo.string << ">";
-	return io;
-}
-
-g_io_stream& operator<<(g_io_stream& io, const Vec2& vec)
-{
-	io << "<X:" << vec.x << ", Y:" << vec.y << ">";
-	return io;
-}
+using namespace CppUtils;
 
 #include <cppUtils/cppMaybe.hpp>
+
+// -------------------- Tests --------------------
+DEFINE_TEST(dummyOne)
+{
+	END_TEST;
+}
+
+DEFINE_TEST(dummyTwo)
+{
+	ASSERT_FALSE(true);
+	END_TEST;
+}
+
+void setupCppPrintTestSuite()
+{
+	Tests::TestSuite& testSuite = Tests::addTestSuite("cppPrint.hpp");
+
+	ADD_TEST(testSuite, dummyOne);
+	ADD_TEST(testSuite, dummyTwo);
+}
 
 // I'm purposely leaking memory and don't want to be warned to see if my
 // library catches it so we disable warnings about unreferenced vars
@@ -70,6 +47,12 @@ void mainFunc()
 	g_logger_set_log_directory("C:/dev/C++/CppUtils/logs");
 	g_memory_init_padding(true, 1024);
 
+
+	setupCppPrintTestSuite();
+
+	Tests::runTests();
+	Tests::free();
+
 	constexpr bool testingCppUtils = false;
 	constexpr bool testingCppPrint = true;
 
@@ -79,21 +62,21 @@ void mainFunc()
 		g_logger_warning("A warning!");
 		g_logger_error("This is an error...");
 
-		std::array<std::thread, 5> threads;
-		std::array<const char*, threads.size()> threadNames;
-		for (size_t i = 0; i < threads.size(); i++)
-		{
-			std::string str = std::string("Thread_") + std::to_string(i);
-			threadNames[i] = (char*)g_memory_allocate(sizeof(char) * (str.length() + 1));
-			g_memory_copyMem((void*)threadNames[i], (void*)str.c_str(), sizeof(char) * (str.length() + 1));
-			threads[i] = std::thread(threadLogger, threadNames[i]);
-		}
+		//std::array<std::thread, 5> threads;
+		//std::array<const char*, threads.size()> threadNames;
+		//for (size_t i = 0; i < threads.size(); i++)
+		//{
+		//	std::string str = std::string("Thread_") + std::to_string(i);
+		//	threadNames[i] = (char*)g_memory_allocate(sizeof(char) * (str.length() + 1));
+		//	g_memory_copyMem((void*)threadNames[i], (void*)str.c_str(), sizeof(char) * (str.length() + 1));
+		//	threads[i] = std::thread(threadLogger, threadNames[i]);
+		//}
 
-		for (size_t i = 0; i < threads.size(); i++)
-		{
-			threads[i].join();
-			g_memory_free((void*)threadNames[i]);
-		}
+		//for (size_t i = 0; i < threads.size(); i++)
+		//{
+		//	threads[i].join();
+		//	g_memory_free((void*)threadNames[i]);
+		//}
 
 		// Untracked memory allocation, we should be warned.
 		void* leakedMemory = g_memory_allocate(sizeof(uint8) * 1025);
@@ -126,26 +109,23 @@ void mainFunc()
 		g_logger_info("{}", "Hello World!");
 
 		const uint8_t invalidUtf8Data[] = { 0xc0, 0x80, 0x00 };
-		auto badString = g_dumbString((const char*)invalidUtf8Data);
+		auto badString = String::makeString((const char*)invalidUtf8Data);
 		g_logger_info("{}", badString);
 		// NOTE: This is unnecessary since the string won't allocate if it's an invalid UTF8 string
 		//       but it's nice in case you're not checking for that type of stuff and just want to
 		//       pass the data forwards whether it's valid or not
-		g_dumbString_free(badString);
+		String::free(badString);
 
 		const uint8_t moreInvalidUtf8Data[] = { 0xED, 0xA1, 0x8C, 0xED, 0xBE, 0xB4 };
-		auto anotherBadString = g_dumbString((const char*)moreInvalidUtf8Data);
+		auto anotherBadString = String::makeString((const char*)moreInvalidUtf8Data);
 		g_logger_info("{}", anotherBadString);
-		g_dumbString_free(anotherBadString);
+		String::free(anotherBadString);
 
-		auto string = g_dumbString(u8"Hello World!");
-		g_DumbString& unboxedString = string.mut_value();
+		auto string = String::makeString(u8"Hello World!");
+		BasicString& unboxedString = string.mut_value();
 		g_logger_info("{}, {}", unboxedString, 2.3f);
-		g_dumbString_free(unboxedString);
+		String::free(unboxedString);
 
-		Vec2 vec2 = Vec2{ 0.3f, 2.1f };
-
-		g_logger_log("Hello World! My Vec2: {}", vec2);
 		g_logger_info("Pi: {}", 3.14f);
 		g_logger_warning("Warning: {}", "Raw string literal");
 		g_logger_error("Error: {}", std::string("C++ string object"));
@@ -198,15 +178,6 @@ void mainFunc()
 
 		g_logger_info("{}", 1.2222239f);
 
-		g_logger_info("Vec2: {{ hello {{ there {{ {:.2f} continue on printing", vec2);
-
-		UnknownStruct unknown = {
-			2.75f,
-			-280,
-			"Hello sailor!"
-		};
-		g_logger_info("Hey this is unknown: {:.2f}", unknown);
-
 		g_logger_log("Here's some hex digits:\n"
 			"    255: {0:10x}\n"
 			"   -128: {0:#x}\n"
@@ -229,7 +200,7 @@ void mainFunc()
 
 		g_logger_info("\n"
 			u8"\u2554{\u2550:^20}\u2557\n"
-			u8"\u2551{☻:^20}\u2551\n"
+			u8"\u2551{ :^20}\u2551\n"
 			u8"\u255a{\u2550:^20}\u255d",
 			"",
 			u8"Hello World!",

@@ -280,7 +280,10 @@ const WORD g_logger_BACKGROUND_RED = 0x0040; // background color contains red.
 
 // Template version of logging for using this library with GABE_CPP_PRINT library
 #ifdef USE_GABE_CPP_PRINT
+
+#undef GABE_CPP_UTILS_IMPL
 #include <cppUtils/cppPrint.hpp>
+#define GABE_CPP_UTILS_IMPL
 
 #ifdef _WIN32
 
@@ -294,7 +297,7 @@ GABE_CPP_UTILS_API void _g_logger_gabeCommonPrint(const char* filename, int line
 	{
 		char buf[20] = { 0 };
 		_g_logger_printPreamble(filename, line, buf, sizeof(buf), color);
-		g_io_printf(format, args...);
+		IO::printf(format, args...);
 		_g_logger_printPostamble(filename, line, buf, sizeof(buf));
 	}
 }
@@ -311,7 +314,7 @@ GABE_CPP_UTILS_API void _g_logger_gabeAssert(const char* filename, int line, boo
 		{
 			char buf[20] = { 0 };
 			_g_logger_assertGabePreamble(filename, line, buf, sizeof(buf));
-			g_io_printf(format, args...);
+			IO::printf(format, args...);
 			_g_logger_assertGabePostamble(filename, line, buf, sizeof(buf));
 		}
 	}
@@ -845,12 +848,14 @@ void g_logger_set_log_directory(const char* directory)
 // ----------------------------------------
 #ifdef _WIN32
 #ifdef USE_GABE_CPP_PRINT
+using namespace CppUtils;
+
 void _g_logger_printPreamble(const char* filename, int line, char* buf, size_t bufSize, WORD color)
 {
 	g_thread_lockMutex(logMutex);
 
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
-	g_io_printf("{} (line {}) Log: \n", filename, line);
+	IO::printf("{} (line {}) Log: \n", filename, line);
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
 	time_t now;
@@ -858,12 +863,12 @@ void _g_logger_printPreamble(const char* filename, int line, char* buf, size_t b
 	struct tm localTime;
 	localtime_s(&localTime, &now);
 	strftime(buf, bufSize, "%Y-%m-%d %I:%M:%S", &localTime);
-	g_io_printf("[{}]: ", buf);
+	IO::printf("[{}]: ", buf);
 }
 
 void _g_logger_printPostamble(const char* filename, int line, char* buf, size_t)
 {
-	g_io_printf("\n");
+	IO::printf("\n");
 
 	if (logFile)
 	{
@@ -887,7 +892,7 @@ void _g_logger_assertGabePreamble(const char* filename, int line, char* buf, siz
 	g_thread_lockMutex(logMutex);
 
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), g_logger_FOREGROUND_RED);
-	g_io_printf("{} (line {}) Assertion Failure: \n", filename, line);
+	IO::printf("{} (line {}) Assertion Failure: \n", filename, line);
 	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), 0x0F);
 
 	time_t now;
@@ -895,12 +900,12 @@ void _g_logger_assertGabePreamble(const char* filename, int line, char* buf, siz
 	struct tm localTime;
 	localtime_s(&localTime, &now);
 	strftime(buf, bufSize, "%Y-%m-%d %I:%M:%S", &localTime);
-	g_io_printf("[{}]: ", buf);
+	IO::printf("[{}]: ", buf);
 }
 
 void _g_logger_assertGabePostamble(const char* filename, int line, char* buf, size_t)
 {
-	g_io_printf("\n");
+	IO::printf("\n");
 
 	if (logFile)
 	{

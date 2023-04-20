@@ -39,14 +39,12 @@ target_compile_definitions(
     CppUtilsTestC PUBLIC
     -D_DEBUG
     -DGABE_CPP_UTILS_TEST_MAIN
-    -DGABE_CPP_UTILS_IMPL
 )
 
 target_compile_definitions(
     CppUtilsTestCpp PUBLIC
     -D_DEBUG
     -DGABE_CPP_UTILS_TEST_MAIN
-    -DGABE_CPP_UTILS_IMPL
 )
 
 # Set output directories

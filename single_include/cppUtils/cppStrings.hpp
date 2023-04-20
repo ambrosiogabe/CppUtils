@@ -1,6 +1,6 @@
 /*
  Do this:
-	 #define GABE_CPP_STRINGS_IMPL
+	 #define GABE_CPP_UTILS_IMPL
  before you include this file in *one* C++ file to create the implementation.
 
  // i.e. it should look like this in *one* source file:
@@ -72,91 +72,103 @@
 #include <stdint.h>
 #include <cppUtils/cppMaybe.hpp>
 
-struct g_io_stream;
+namespace CppUtils {
+
+struct Stream;
 
 // ----- Basic string data structures/constructors/destructors -----
 // Should always be UTF8-Encoded
-struct g_DumbString
+struct BasicString
 {
 	uint8_t* data;
 	size_t numBytes;
 	size_t numCharacters;
 };
 
-struct g_DumbConstantString
+struct ConstantString
 {
 	const uint8_t* rawStringLiteral;
 	size_t numBytes;
 	size_t numCharacters;
 };
 
-enum g_Utf8ErrorCode
+enum class Utf8ErrorCode : uint8_t
 {
-	g_Utf8ErrorCode_Success = 0,
-	g_Utf8ErrorCode_InvalidString = 5,
+	InvalidString = 0,
 };
 
-g_io_stream& operator<<(g_io_stream& io, g_Utf8ErrorCode error);
+namespace String {
 
-g_Maybe<g_DumbConstantString, g_Utf8ErrorCode> g_dumbConstantString(const char* rawStringLiteral);
-g_Maybe<g_DumbString, g_Utf8ErrorCode> g_dumbString(const char* rawString);
+Maybe<ConstantString, Utf8ErrorCode> makeConstantString(const char* rawStringLiteral);
+Maybe<BasicString, Utf8ErrorCode> makeString(const char* rawString);
 
-void g_dumbString_free(g_Maybe<g_DumbString, g_Utf8ErrorCode>& string);
-void g_dumbString_free(g_DumbString& string);
+void free(Maybe<BasicString, Utf8ErrorCode>& string);
+void free(BasicString& string);
 
-g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString);
-g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString, size_t rawStringNumBytes);
+Maybe<size_t, Utf8ErrorCode> utf8Length(const char* rawString);
+Maybe<size_t, Utf8ErrorCode> utf8Length(const char* rawString, size_t rawStringNumBytes);
 
-bool operator==(const g_DumbString& a, const g_DumbString& b);
-bool operator==(const g_DumbConstantString& a, const g_DumbConstantString& b);
+bool operator==(const BasicString& a, const BasicString& b);
+bool operator==(const ConstantString& a, const ConstantString& b);
+
+} // End String
 
 // ----- Parsing helpers -----
 // NOTE: This data structure is NON-OWNING, so it will not make a copy of the string
 //       It is up to the caller to ensure that the raw string lives throughout any
-//       subsequent calls to g_parser_*
-struct g_ParseInfo
+//       subsequent calls to Parser::*
+struct ParseInfo
 {
 	const uint8_t* utf8String;
 	size_t cursor;
 	size_t numBytes;
 };
 
-g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString, size_t numBytes);
-g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString);
-inline g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const g_DumbString& dumbString) { return g_parser_makeParser((const char*)dumbString.data, dumbString.numBytes); }
+namespace Parser {
 
-g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset = 0);
-g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount = 0);
+Maybe<ParseInfo, Utf8ErrorCode> makeParseInfo(const char* rawString, size_t numBytes);
+Maybe<ParseInfo, Utf8ErrorCode> makeParseInfo(const char* rawString);
+inline Maybe<ParseInfo, Utf8ErrorCode> makeParseInfo(const BasicString& dumbString) { return makeParseInfo((const char*)dumbString.data, dumbString.numBytes); }
+
+Maybe<uint32_t, Utf8ErrorCode> parseCharacter(ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset = 0);
+Maybe<uint32_t, Utf8ErrorCode> peek(ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount = 0);
+
+} } // End CppUtils::Parser
+
+// Stupid stuff. We have to have this operator in the global namespace to make sure it can be resolved appropriately
+CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Utf8ErrorCode error);
 
 #endif // GABE_CPP_STRINGS_H
 
-#ifdef GABE_CPP_STRINGS_IMPL
+#ifdef GABE_CPP_UTILS_IMPL
+
+#undef GABE_CPP_UTILS_IMPL
 #include <cppUtils/cppUtils.hpp>
+#define GABE_CPP_UTILS_IMPL
 
-// ------------- Internal Functions -------------
-static size_t getNumBytesTilNull(const char* rawString);
-static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* rawString, size_t numBytes, size_t cursor);
-static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, size_t numBytes, uint8_t numOctets, size_t cursor);
-
-g_io_stream& operator<<(g_io_stream& io, g_Utf8ErrorCode error)
+CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Utf8ErrorCode error)
 {
 	switch (error)
 	{
-	case g_Utf8ErrorCode_InvalidString:
-		io << "Invalid UTF8 String";
-		break;
-	case g_Utf8ErrorCode_Success:
-		io << "Success";
+	case CppUtils::Utf8ErrorCode::InvalidString:
+		io << "Invalid UTF8 BasicString";
 		break;
 	}
 
 	return io;
 }
 
-g_Maybe<g_DumbString, g_Utf8ErrorCode> g_dumbString(const char* rawString)
+namespace CppUtils { namespace String {
+
+// ------------- Internal Functions -------------
+static size_t getNumBytesTilNull(const char* rawString);
+static Maybe<uint8_t, Utf8ErrorCode> getNumOctets(const uint8_t* rawString, size_t numBytes, size_t cursor);
+static Maybe<uint32_t, Utf8ErrorCode> decodeChar(const uint8_t* rawString, size_t numBytes, uint8_t numOctets, size_t cursor);
+
+Maybe<BasicString, Utf8ErrorCode> makeString(const char* rawString)
 {
 	size_t numBytes = getNumBytesTilNull(rawString);
-	g_Maybe<size_t, g_Utf8ErrorCode> numCharacters = g_dumbString_utf8Length(rawString, numBytes);
+	Maybe<size_t, Utf8ErrorCode> numCharacters = utf8Length(rawString, numBytes);
 	if (!numCharacters.hasValue())
 	{
 		return numCharacters.error();
@@ -167,24 +179,24 @@ g_Maybe<g_DumbString, g_Utf8ErrorCode> g_dumbString(const char* rawString)
 	g_memory_copyMem(dumbString, (void*)rawString, numBytes * sizeof(uint8_t));
 	dumbString[numBytes] = '\0';
 
-	return g_DumbString{
+	return BasicString{
 		dumbString,
 		numBytes,
 		numCharacters.value()
 	};
 }
 
-g_Maybe<g_DumbConstantString, g_Utf8ErrorCode> g_dumbConstantString(const char* rawStringLiteral)
+Maybe<ConstantString, Utf8ErrorCode> makeConstantString(const char* rawStringLiteral)
 {
 	size_t numBytes = getNumBytesTilNull(rawStringLiteral);
 	// Constant strings live through the lifetime of the program and don't need to be malloced
-	g_DumbConstantString res = {
+	ConstantString res = {
 		(const uint8_t*)rawStringLiteral,
 		numBytes,
 		0
 	};
 
-	g_Maybe<size_t, g_Utf8ErrorCode> numCharacters = g_dumbString_utf8Length(rawStringLiteral);
+	Maybe<size_t, Utf8ErrorCode> numCharacters = utf8Length(rawStringLiteral);
 	if (numCharacters.hasValue())
 	{
 		res.numCharacters = numCharacters.value();
@@ -194,21 +206,21 @@ g_Maybe<g_DumbConstantString, g_Utf8ErrorCode> g_dumbConstantString(const char* 
 	return numCharacters.error();
 }
 
-void g_dumbString_free(g_Maybe<g_DumbString, g_Utf8ErrorCode>& string)
+void free(Maybe<BasicString, Utf8ErrorCode>& string)
 {
 	if (string.hasValue())
 	{
-		g_dumbString_free(string.mut_value());
+		free(string.mut_value());
 	}
 }
 
-void g_dumbString_free(g_DumbString& string)
+void free(BasicString& string)
 {
 	g_memory_free(string.data);
-	g_memory_zeroMem(&string, sizeof(g_DumbString));
+	g_memory_zeroMem(&string, sizeof(BasicString));
 }
 
-g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString, size_t numBytes)
+Maybe<size_t, Utf8ErrorCode> utf8Length(const char* rawString, size_t numBytes)
 {
 	// Count the number of characters in the string and also validate the UTF8 string
 	// along the way
@@ -234,80 +246,20 @@ g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString, 
 	return numCharacters;
 }
 
-g_Maybe<size_t, g_Utf8ErrorCode> g_dumbString_utf8Length(const char* rawString)
+Maybe<size_t, Utf8ErrorCode> utf8Length(const char* rawString)
 {
 	size_t numBytes = getNumBytesTilNull(rawString);
-	return g_dumbString_utf8Length(rawString, numBytes);
+	return utf8Length(rawString, numBytes);
 }
 
-bool operator==(const g_DumbString& a, const g_DumbString& b)
+bool operator==(const BasicString& a, const BasicString& b)
 {
 	return g_memory_compareMem(a.data, a.numBytes, b.data, b.numBytes);
 }
 
-bool operator==(const g_DumbConstantString& a, const g_DumbConstantString& b)
+bool operator==(const ConstantString& a, const ConstantString& b)
 {
 	return g_memory_compareMem((void*)a.rawStringLiteral, a.numBytes, (void*)b.rawStringLiteral, b.numBytes);
-}
-
-g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString, size_t numBytes)
-{
-	g_ParseInfo res;
-	res.cursor = 0;
-	res.numBytes = numBytes;
-	res.utf8String = (const uint8_t*)rawString;
-	return res;
-}
-
-g_Maybe<g_ParseInfo, g_Utf8ErrorCode> g_parser_makeParser(const char* rawString)
-{
-	return g_parser_makeParser(rawString, getNumBytesTilNull(rawString));
-}
-
-g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_parseCharacter(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset)
-{
-	auto numOctets = getNumOctets(parseInfo.utf8String, parseInfo.numBytes, parseInfo.cursor + offset);
-	if (!numOctets.hasValue())
-	{
-		return numOctets.error();
-	}
-
-	auto character = decodeChar(parseInfo.utf8String, parseInfo.numBytes, numOctets.value(), offset + parseInfo.cursor);
-	if (!character.hasValue())
-	{
-		return character.error();
-	}
-
-	*numBytesParsed = *numOctets;
-	return character.value();
-}
-
-g_Maybe<uint32_t, g_Utf8ErrorCode> g_parser_peek(g_ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount)
-{
-	if (parseInfo.cursor >= parseInfo.numBytes)
-	{
-		return '\0';
-	}
-
-	g_Maybe<uint32_t, g_Utf8ErrorCode> res = 0;
-
-	size_t peekCursorPos = 0;
-	size_t numCharsParsed = 0;
-	while (numCharsParsed <= peekAmount)
-	{
-		uint8_t numBytesParsedInternal = 0;
-		res = g_parser_parseCharacter(parseInfo, &numBytesParsedInternal, peekCursorPos);
-		if (!res.hasValue())
-		{
-			return res.error();
-		}
-
-		peekCursorPos += numBytesParsedInternal;
-		numCharsParsed++;
-	}
-
-	*numBytesParsed = (uint8_t)peekCursorPos;
-	return res;
 }
 
 // ------------- Internal Functions -------------
@@ -323,11 +275,11 @@ static size_t getNumBytesTilNull(const char* rawString)
 	return i;
 }
 
-static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, size_t numBytes, size_t cursor)
+static Maybe<uint8_t, Utf8ErrorCode> getNumOctets(const uint8_t* string, size_t numBytes, size_t cursor)
 {
 	if (cursor >= numBytes)
 	{
-		return g_Utf8ErrorCode_InvalidString;
+		return Utf8ErrorCode::InvalidString;
 	}
 
 	// ------- Useful Constants -------
@@ -365,7 +317,7 @@ static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, siz
 	{
 		if (cursor + 1 >= numBytes)
 		{
-			return g_Utf8ErrorCode_InvalidString;
+			return Utf8ErrorCode::InvalidString;
 		}
 
 		bool secondByteValid = (string[cursor + 1] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
@@ -376,7 +328,7 @@ static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, siz
 	{
 		if (cursor + 2 >= numBytes)
 		{
-			return g_Utf8ErrorCode_InvalidString;
+			return Utf8ErrorCode::InvalidString;
 		}
 
 		bool secondByteValid = (string[cursor + 1] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
@@ -388,7 +340,7 @@ static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, siz
 	{
 		if (cursor + 3 >= numBytes)
 		{
-			return g_Utf8ErrorCode_InvalidString;
+			return Utf8ErrorCode::InvalidString;
 		}
 
 		bool secondByteValid = (string[cursor + 1] >> OCTET_EXTRA_BYTE_SHIFT_AMT) == OCTET_EXTRA_BYTE_MASK;
@@ -403,14 +355,14 @@ static g_Maybe<uint8_t, g_Utf8ErrorCode> getNumOctets(const uint8_t* string, siz
 		return numOctets;
 	}
 
-	return g_Utf8ErrorCode_InvalidString;
+	return Utf8ErrorCode::InvalidString;
 }
 
-static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, size_t numBytes, uint8_t numOctets, size_t cursor)
+static Maybe<uint32_t, Utf8ErrorCode> decodeChar(const uint8_t* rawString, size_t numBytes, uint8_t numOctets, size_t cursor)
 {
 	if (cursor + numOctets > numBytes)
 	{
-		return g_Utf8ErrorCode_InvalidString;
+		return Utf8ErrorCode::InvalidString;
 	}
 
 	// Simple case, just return the masked byte
@@ -423,7 +375,7 @@ static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, s
 		// Invalid range
 		if (res > 0x007f)
 		{
-			return g_Utf8ErrorCode_InvalidString;
+			return Utf8ErrorCode::InvalidString;
 		}
 
 		return res;
@@ -448,7 +400,7 @@ static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, s
 		// Invalid range
 		if (res < 0x0080 || res > 0x07ff)
 		{
-			return g_Utf8ErrorCode_InvalidString;
+			return Utf8ErrorCode::InvalidString;
 		}
 
 		return res;
@@ -466,7 +418,7 @@ static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, s
 		// Invalid range
 		if (res < 0x0800 || res > 0xffff)
 		{
-			return g_Utf8ErrorCode_InvalidString;
+			return Utf8ErrorCode::InvalidString;
 		}
 
 		return res;
@@ -485,7 +437,7 @@ static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, s
 		// Invalid range
 		if (res < 0x001'0000 || res > 0x0010'ffff)
 		{
-			return g_Utf8ErrorCode_InvalidString;
+			return Utf8ErrorCode::InvalidString;
 		}
 
 		return res;
@@ -493,7 +445,73 @@ static g_Maybe<uint32_t, g_Utf8ErrorCode> decodeChar(const uint8_t* rawString, s
 	break;
 	}
 
-	return g_Utf8ErrorCode_InvalidString;
+	return Utf8ErrorCode::InvalidString;
 }
+
+} // End String
+
+namespace Parser {
+
+Maybe<ParseInfo, Utf8ErrorCode> makeParseInfo(const char* rawString, size_t numBytes)
+{
+	ParseInfo res;
+	res.cursor = 0;
+	res.numBytes = numBytes;
+	res.utf8String = (const uint8_t*)rawString;
+	return res;
+}
+
+Maybe<ParseInfo, Utf8ErrorCode> makeParseInfo(const char* rawString)
+{
+	return makeParseInfo(rawString, String::getNumBytesTilNull(rawString));
+}
+
+Maybe<uint32_t, Utf8ErrorCode> parseCharacter(ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t offset)
+{
+	auto numOctets = String::getNumOctets(parseInfo.utf8String, parseInfo.numBytes, parseInfo.cursor + offset);
+	if (!numOctets.hasValue())
+	{
+		return numOctets.error();
+	}
+
+	auto character = String::decodeChar(parseInfo.utf8String, parseInfo.numBytes, numOctets.value(), offset + parseInfo.cursor);
+	if (!character.hasValue())
+	{
+		return character.error();
+	}
+
+	*numBytesParsed = *numOctets;
+	return character.value();
+}
+
+Maybe<uint32_t, Utf8ErrorCode> peek(ParseInfo& parseInfo, uint8_t* numBytesParsed, size_t peekAmount)
+{
+	if (parseInfo.cursor >= parseInfo.numBytes)
+	{
+		return '\0';
+	}
+
+	Maybe<uint32_t, Utf8ErrorCode> res = 0;
+
+	size_t peekCursorPos = 0;
+	size_t numCharsParsed = 0;
+	while (numCharsParsed <= peekAmount)
+	{
+		uint8_t numBytesParsedInternal = 0;
+		res = parseCharacter(parseInfo, &numBytesParsedInternal, peekCursorPos);
+		if (!res.hasValue())
+		{
+			return res.error();
+		}
+
+		peekCursorPos += numBytesParsedInternal;
+		numCharsParsed++;
+	}
+
+	*numBytesParsed = (uint8_t)peekCursorPos;
+	return res;
+}
+
+} } // End CppUtils::Parser
 
 #endif // GABE_CPP_STRINGS_IMPL

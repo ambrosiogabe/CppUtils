@@ -3,16 +3,18 @@
 #include <type_traits>
 #include <variant>
 
+namespace CppUtils {
+
 template<
 	typename T, 
 	typename E, 
-	std::enable_if_t<std::is_convertible_v<E, int>, int> = 0>
-struct g_Maybe
+	std::enable_if_t<std::is_enum_v<E>, int> = 0>
+struct Maybe
 {
-	g_Maybe(const T& value)
+	Maybe(const T& value)
 		: data(std::move(value)) {}
 
-	g_Maybe(const E& error) 
+	Maybe(const E& error) 
 		: data(error) {}
 
 	std::variant<T, E> data;
@@ -36,4 +38,6 @@ struct g_Maybe
 	constexpr inline const T& operator*() const { return std::move(std::get<T>(data)); }
 };
 
-#endif 
+} // End CppUtils
+
+#endif // End GABE_CPP_MAYBE_H

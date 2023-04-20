@@ -5,7 +5,7 @@
  before you include this file in *one* C++ file to create the implementation.
 
  // i.e. it should look like this in *one* source file:
- #define GABE_CPP_PRINT_IMPL
+ #define GABE_CPP_UTILS_IMPL
  #include "cppPrint.hpp"
 
  -------- QUICK_START + cppUtils.hpp --------
@@ -123,6 +123,7 @@
 #define GABE_CPP_PRINT_H
 
 #include <string>
+#include <stdexcept>
 #include <cppUtils/cppMaybe.hpp>
 
 // Override this define to add DLL support on your platform
@@ -134,9 +135,17 @@
 #define USE_GABE_CPP_PRINT
 #endif
 
-struct g_DumbString;
+namespace CppUtils { struct Stream; }
 
-enum class g_io_stream_mods : uint32_t
+template<typename T>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, T const& t);
+
+namespace CppUtils { 
+
+struct BasicString;
+
+// Structures/enumerations live inside CppUtils scope
+enum class StreamMods : uint32_t
 {
 	None = 0,
 	PrecisionSet = 1 << 0,
@@ -144,7 +153,7 @@ enum class g_io_stream_mods : uint32_t
 	AltFormat = 1 << 2,
 };
 
-enum class g_io_stream_paramType : uint16_t
+enum class StreamParamType : uint16_t
 {
 	None,
 	Binary,
@@ -159,99 +168,46 @@ enum class g_io_stream_paramType : uint16_t
 	Pointer,
 };
 
-enum class g_io_stream_align : uint8_t
+enum class StreamAlign : uint8_t
 {
 	Left,
 	Right,
 	Center
 };
 
-enum class g_io_stream_sign : uint8_t
+enum class StreamSign : uint8_t
 {
 	Positive,
 	Negative,
 	Space
 };
 
-struct g_io_stream
+struct Stream
 {
 	uint16_t precision;
 	uint16_t width;
 	uint32_t fillCharacter;
-	/*u32*/ g_io_stream_mods mods;
-	/*u16*/ g_io_stream_paramType type;
-	/* u8*/ g_io_stream_align alignment;
-	/* u8*/ g_io_stream_sign sign;
+	/*u32*/ StreamMods mods;
+	/*u16*/ StreamParamType type;
+	/* u8*/ StreamAlign alignment;
+	/* u8*/ StreamSign sign;
 
 	void parseModifiers(const char* modifiersStr, size_t length);
 	void resetModifiers();
 };
 
-extern g_io_stream g_io_stream_stdout;
-
-template<typename T>
-g_io_stream& operator<<(g_io_stream& io, T const& t);
-
-// Helper for raw string literals and char[N] arrays
-template<std::size_t N>
-using g_io_sizedCharArray = char[N];
-
-// Specializations for common types
-template<>
-g_io_stream& operator<<(g_io_stream& io, float const& number);
-template<>
-g_io_stream& operator<<(g_io_stream& io, double const& number);
-template<>
-g_io_stream& operator<<(g_io_stream& io, int8_t const& integer);
-template<>
-g_io_stream& operator<<(g_io_stream& io, int16_t const& integer);
-template<>
-g_io_stream& operator<<(g_io_stream& io, int32_t const& integer);
-template<>
-g_io_stream& operator<<(g_io_stream& io, int64_t const& integer);
-template<>
-g_io_stream& operator<<(g_io_stream& io, uint8_t const& integer);
-template<>
-g_io_stream& operator<<(g_io_stream& io, uint16_t const& integer);
-template<>
-g_io_stream& operator<<(g_io_stream& io, uint32_t const& integer);
-template<>
-g_io_stream& operator<<(g_io_stream& io, uint64_t const& integer);
-template<>
-g_io_stream& operator<<(g_io_stream& io, g_DumbString const& dumbString);
-template<>
-g_io_stream& operator<<(g_io_stream& io, const char* const& s);
-template<>
-g_io_stream& operator<<(g_io_stream& io, char* const& s);
-template<std::size_t N>
-g_io_stream& operator<<(g_io_stream& io, g_io_sizedCharArray<N> const& s)
+namespace IO
 {
-	// NOTE: N - 1 is because we don't want to count the null byte that ends the C-String
-	_g_io_print_string_formatted((const char*)s, N - 1, "", 0, io);
-	return io;
-}
-template<>
-g_io_stream& operator<<(g_io_stream& io, std::string const& str);
-template<typename T, typename E>
-g_io_stream& operator<<(g_io_stream& io, g_Maybe<T, E> const& maybeVal)
-{
-	if (maybeVal.hasValue())
-	{
-		io << maybeVal.value();
-	}
-	else
-	{
-		io << "<Maybe=Error, '" << maybeVal.error() << "'>";
-	}
-	return io;
-}
 
-GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length);
+extern Stream stdoutStream;
 
-GABE_CPP_PRINT_API void g_io_printf(const char* s);
+GABE_CPP_PRINT_API void _printfInternal(const char* s, size_t length);
+GABE_CPP_PRINT_API void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io);
+
+GABE_CPP_PRINT_API void printf(const char* s);
 
 template<typename T, typename...Args>
-GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, const T& value, const Args&... args)
+GABE_CPP_PRINT_API void _printfInternal(const char* s, size_t length, const T& value, const Args&... args)
 {
 	size_t stringStart = 0;
 	size_t numBytes = 0;
@@ -262,15 +218,15 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 		{
 			if (i < length - 1 && s[i + 1] == '{')
 			{
-				_g_io_printf_internal(s + stringStart, numBytes);
-				_g_io_printf_internal("{", 1);
+				_printfInternal(s + stringStart, numBytes);
+				_printfInternal("{", 1);
 				numBytes = 0;
 				i++;
 				stringStart = i + 1;
 			}
 			else
 			{
-				_g_io_printf_internal(s + stringStart, numBytes);
+				_printfInternal(s + stringStart, numBytes);
 				fmtStart = i + 1;
 			}
 			continue;
@@ -281,15 +237,15 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 			// Closing the format string
 			if (s[i] == '}')
 			{
-				g_io_stream_stdout.parseModifiers(s + fmtStart, i - fmtStart);
-				g_io_stream_stdout << value;
-				g_io_stream_stdout.resetModifiers();
+				stdoutStream.parseModifiers(s + fmtStart, i - fmtStart);
+				stdoutStream << value;
+				stdoutStream.resetModifiers();
 				// NOTE: Recursively call the variadic template argument, with unpacked variables
 				//       The base case, where there is no args... left is handled in the function
 				//       above
 				if (length >= i + 1)
 				{
-					return _g_io_printf_internal((s + i + 1), length - i - 1, args...);
+					return _printfInternal((s + i + 1), length - i - 1, args...);
 				}
 				return;
 			}
@@ -304,7 +260,7 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 	{
 		// TODO: Do we really want to throw an error for extra arguments provided to printf
 		//       Do performance profiling and see if it causes any significant impact
-		throw std::runtime_error("Extra arguments provided to g_io_printf");
+		throw std::runtime_error("Extra arguments provided to printf");
 	}
 	else
 	{
@@ -313,92 +269,124 @@ GABE_CPP_PRINT_API void _g_io_printf_internal(const char* s, size_t length, cons
 }
 
 template<typename T, typename... Args>
-GABE_CPP_PRINT_API void g_io_printf(const char* s, const T& value, const Args&... args)
+GABE_CPP_PRINT_API void printf(const char* s, const T& value, const Args&... args)
 {
 	size_t strLength = strlen(s);
-	_g_io_printf_internal(s, strLength, value, args...);
+	_printfInternal(s, strLength, value, args...);
+}
+
+} } // End CppUtils::io
+
+// Helper for raw string literals and char[N] arrays
+template<std::size_t N>
+using SizedCharArray = char[N];
+
+// Specializations for common types
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, float const& number);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, double const& number);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, int8_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, int16_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, int32_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, int64_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, uint8_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, uint16_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, uint32_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, uint64_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::BasicString const& dumbString);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, const char* const& s);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, unsigned char* const& s);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, char* const& s);
+template<std::size_t N>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, SizedCharArray<N> const& s)
+{
+	// NOTE: N - 1 is because we don't want to count the null byte that ends the C-String
+	CppUtils::IO::printFormattedString((const char*)s, N - 1, "", 0, io);
+	return io;
+}
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, std::string const& str);
+template<typename T, typename E>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Maybe<T, E> const& maybeVal)
+{
+	if (maybeVal.hasValue())
+	{
+		io << maybeVal.value();
+	}
+	else
+	{
+		io << "<Maybe=Error, '" << maybeVal.error() << "'>";
+	}
+	return io;
 }
 
 #endif // GABE_CPP_PRINT_H
 
 // ------------------------ Implementation ------------------------
-#ifdef GABE_CPP_PRINT_IMPL
+#ifdef GABE_CPP_UTILS_IMPL
 
+#undef GABE_CPP_UTILS_IMPL
 #include <cppUtils/cppStrings.hpp>
-#include <stdexcept>
+#define GABE_CPP_UTILS_IMPL
 
+namespace CppUtils { namespace IO {
 // -------------------- Common --------------------
 
 // ------ Internal variables ------
-g_io_stream g_io_stream_stdout = {
+Stream stdoutStream = {
 	0,
 	0,
 	' ',
-	g_io_stream_mods::None,
-	g_io_stream_paramType::None,
-	g_io_stream_align::Right,
-	g_io_stream_sign::Positive
+	StreamMods::None,
+	StreamParamType::None,
+	StreamAlign::Right,
+	StreamSign::Positive
 };
 
 // NOTE: Big enough to hold 64 bits (for binary representation) plus an apostrophe every 4 bits (for clarity in reading)
 static constexpr size_t maxIntegerBufferSize = 81;
 
 // ------ Internal functions ------
-static void _g_io_print_string_formatted(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const g_io_stream& io);
-static const char* _g_io_get_int_prefix(const g_io_stream& io);
-static size_t _g_io_get_int_prefix_size(const g_io_stream& io);
-static const char* _g_io_get_float_prefix(const g_io_stream& io);
-static size_t _g_io_get_float_prefix_size(const g_io_stream& io);
-static inline bool g_io_isWhitespace(uint32_t c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
-static inline bool g_io_isDigit(uint32_t c) { return c >= '0' && c <= '9'; }
-static inline int32_t g_io_toNumber(uint32_t c) { return (int32_t)(c - '0'); }
+static const char* getIntPrefix(const Stream& io);
+static size_t getIntPrefixSize(const Stream& io);
+static const char* getFloatPrefix(const Stream& io);
+static size_t getFloatPrefixSize(const Stream& io);
+static inline bool isWhitespace(uint32_t c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; }
+static inline bool isDigit(uint32_t c) { return c >= '0' && c <= '9'; }
+static inline int32_t toNumber(uint32_t c) { return (int32_t)(c - '0'); }
+static int32_t parseNextInteger(const char* str, size_t length, size_t* numCharactersParsed);
+} // End io
 
-static int32_t g_io_parseNextInteger(const char* str, size_t length, size_t* numCharactersParsed)
-{
-	size_t cursor = 0;
-
-	// Keep parsing until we hit length or a non-integer-digit
-	while (cursor < length && g_io_isDigit(str[cursor]))
-	{
-		cursor++;
-	}
-
-	*numCharactersParsed = cursor;
-	if (cursor == 0)
-	{
-		// No digits parsed, this failed to parse a number so early exit to avoid
-		// buffer overflows in the next function
-		return 0;
-	}
-
-	int32_t multiplier = 1;
-	int32_t result = 0;
-	for (int i = (int)(cursor - 1); i >= 0; i--)
-	{
-		// TODO: Do something to handle overflow here
-		result += (multiplier * g_io_toNumber(str[i]));
-		multiplier *= 10;
-	}
-
-	return result;
-}
-
-void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
+// ------ Stream ------
+void Stream::parseModifiers(const char* modifiersStr, size_t length)
 {
 	// format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
-	auto maybeParseInfo = g_parser_makeParser(modifiersStr, length);;
+	auto maybeParseInfo = Parser::makeParseInfo(modifiersStr, length);;
 	if (!maybeParseInfo.hasValue())
 	{
 		throw std::runtime_error("Invalid UTF8 string passed to printf.");
 	}
 
-	g_ParseInfo& parseInfo = maybeParseInfo.mut_value();
+	ParseInfo& parseInfo = maybeParseInfo.mut_value();
 
 	// Parse [fill](":")
 	// Return early if end of string is reached with no specifiers
 	uint8_t numBytesParsed;
 	{
-		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		auto c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
@@ -417,7 +405,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 			parseInfo.cursor += numBytesParsed;
 		}
 
-		c = g_parser_peek(parseInfo, &numBytesParsed);
+		c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
@@ -441,7 +429,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse [align]
 	{
-		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		auto c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
@@ -450,15 +438,15 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 		switch (*c)
 		{
 		case '<':
-			this->alignment = g_io_stream_align::Left;
+			this->alignment = StreamAlign::Left;
 			parseInfo.cursor += numBytesParsed;
 			break;
 		case '>':
-			this->alignment = g_io_stream_align::Right;
+			this->alignment = StreamAlign::Right;
 			parseInfo.cursor += numBytesParsed;
 			break;
 		case '^':
-			this->alignment = g_io_stream_align::Center;
+			this->alignment = StreamAlign::Center;
 			parseInfo.cursor += numBytesParsed;
 			break;
 		default:
@@ -468,7 +456,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse [sign]
 	{
-		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		auto c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
@@ -477,15 +465,15 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 		switch (*c)
 		{
 		case '+':
-			this->sign = g_io_stream_sign::Positive;
+			this->sign = StreamSign::Positive;
 			parseInfo.cursor += numBytesParsed;
 			break;
 		case '-':
-			this->sign = g_io_stream_sign::Negative;
+			this->sign = StreamSign::Negative;
 			parseInfo.cursor += numBytesParsed;
 			break;
 		case ' ':
-			this->sign = g_io_stream_sign::Space;
+			this->sign = StreamSign::Space;
 			parseInfo.cursor += numBytesParsed;
 			break;
 		default:
@@ -495,7 +483,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse ["#"] alt form shebang
 	{
-		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		auto c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
@@ -503,23 +491,23 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 		if (*c == '#')
 		{
-			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::AltFormat);
+			this->mods = (StreamMods)((uint32_t)this->mods | (uint32_t)StreamMods::AltFormat);
 			parseInfo.cursor += numBytesParsed;
 		}
 	}
 
 	// Parse [width]
 	{
-		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		auto c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
 		}
 
-		if (g_io_isDigit(*c))
+		if (IO::isDigit(*c))
 		{
 			size_t numBytesParsedForNum;
-			uint32_t parsedNumber = g_io_parseNextInteger(modifiersStr + parseInfo.cursor, length - parseInfo.cursor, &numBytesParsedForNum);
+			uint32_t parsedNumber = IO::parseNextInteger(modifiersStr + parseInfo.cursor, length - parseInfo.cursor, &numBytesParsedForNum);
 			if (parsedNumber >= UINT16_MAX)
 			{
 				throw std::runtime_error("Invalid format specification. Width can only be specified up to UINT16_MAX digits.");
@@ -531,7 +519,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse ["." precision]
 	{
-		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		auto c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
@@ -539,23 +527,23 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 		if (*c == '.')
 		{
-			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::PrecisionSet);
+			this->mods = (StreamMods)((uint32_t)this->mods | (uint32_t)StreamMods::PrecisionSet);
 			parseInfo.cursor += numBytesParsed;
 
 			// Parse precision digits
-			c = g_parser_peek(parseInfo, &numBytesParsed);
+			c = Parser::peek(parseInfo, &numBytesParsed);
 			if (!c.hasValue())
 			{
 				throw std::runtime_error("Invalid UTF8 string passed to printf.");
 			}
 
-			if (!g_io_isDigit(*c))
+			if (!IO::isDigit(*c))
 			{
 				throw std::runtime_error("Invalid format specification. \".\" must be followed by an integer to specify a precision width.");
 			}
 
 			size_t numBytesParsedForNum;
-			int32_t parsedNumber = g_io_parseNextInteger(modifiersStr + parseInfo.cursor, length - parseInfo.cursor, &numBytesParsedForNum);
+			int32_t parsedNumber = IO::parseNextInteger(modifiersStr + parseInfo.cursor, length - parseInfo.cursor, &numBytesParsedForNum);
 			if (parsedNumber >= UINT16_MAX)
 			{
 				throw std::runtime_error("Invalid format specification. Precision can only be up to UINT16_MAX digits in [\".\" precision] of format specifier.");
@@ -567,7 +555,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 
 	// Parse type
 	{
-		auto c = g_parser_peek(parseInfo, &numBytesParsed);
+		auto c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
@@ -579,39 +567,39 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 		{
 		case 'b':
 		case 'B':
-			this->type = g_io_stream_paramType::Binary;
+			this->type = StreamParamType::Binary;
 			break;
 		case 'c':
-			this->type = g_io_stream_paramType::Character;
+			this->type = StreamParamType::Character;
 			break;
 		case 'd':
-			this->type = g_io_stream_paramType::Decimal;
+			this->type = StreamParamType::Decimal;
 			break;
 		case 'o':
-			this->type = g_io_stream_paramType::Octal;
+			this->type = StreamParamType::Octal;
 			break;
 		case 'x':
 		case 'X':
-			this->type = g_io_stream_paramType::Hexadecimal;
+			this->type = StreamParamType::Hexadecimal;
 			break;
 		case 'a':
 		case 'A':
-			this->type = g_io_stream_paramType::FloatHexadecimal;
+			this->type = StreamParamType::FloatHexadecimal;
 			break;
 		case 'e':
 		case 'E':
-			this->type = g_io_stream_paramType::ExponentNotation;
+			this->type = StreamParamType::ExponentNotation;
 			break;
 		case 'f':
 		case 'F':
-			this->type = g_io_stream_paramType::FixedPoint;
+			this->type = StreamParamType::FixedPoint;
 			break;
 		case 'g':
 		case 'G':
-			this->type = g_io_stream_paramType::GeneralFormat;
+			this->type = StreamParamType::GeneralFormat;
 			break;
 		case 'p':
-			this->type = g_io_stream_paramType::Pointer;
+			this->type = StreamParamType::Pointer;
 			break;
 		default:
 			typeParsed = false;
@@ -621,7 +609,7 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 		// Check if the modifier is capitalized
 		if (typeParsed && *c >= 'A' && *c <= 'Z')
 		{
-			this->mods = (g_io_stream_mods)((uint32_t)this->mods | (uint32_t)g_io_stream_mods::CapitalModifier);
+			this->mods = (StreamMods)((uint32_t)this->mods | (uint32_t)StreamMods::CapitalModifier);
 		}
 	}
 
@@ -632,16 +620,20 @@ void g_io_stream::parseModifiers(const char* modifiersStr, size_t length)
 	}
 }
 
-void g_io_stream::resetModifiers()
+void Stream::resetModifiers()
 {
-	this->alignment = g_io_stream_align::Right;
+	this->alignment = StreamAlign::Right;
 	this->fillCharacter = ' ';
-	this->mods = g_io_stream_mods::None;
+	this->mods = StreamMods::None;
 	this->precision = 0;
-	this->sign = g_io_stream_sign::Positive;
-	this->type = g_io_stream_paramType::None;
+	this->sign = StreamSign::Positive;
+	this->type = StreamParamType::None;
 	this->width = 0;
 }
+
+} // End CppUtils
+
+using namespace CppUtils;
 
 template<typename T>
 static size_t integerToString(char* const buffer, size_t bufferSize, T integer)
@@ -786,37 +778,37 @@ static size_t dataToBinaryString(char* const buffer, size_t bufferSize, void* da
 }
 
 template<typename T>
-static size_t integerToString(char* const buffer, size_t bufferSize, T integer, g_io_stream& io)
+static size_t integerToString(char* const buffer, size_t bufferSize, T integer, Stream& io)
 {
 	switch (io.type)
 	{
-	case g_io_stream_paramType::None: // Default to decimal display
+	case StreamParamType::None: // Default to decimal display
 		// TODO: Should we throw a runtime error here or does it really matter?
-	case g_io_stream_paramType::FixedPoint: // Treat any floating point modifiers as the default state as well
-	case g_io_stream_paramType::Decimal:
+	case StreamParamType::FixedPoint: // Treat any floating point modifiers as the default state as well
+	case StreamParamType::Decimal:
 		return integerToString(buffer, bufferSize, integer);
-	case g_io_stream_paramType::Hexadecimal:
+	case StreamParamType::Hexadecimal:
 		return integerToHexString(buffer, bufferSize, &integer, sizeof(T),
-			(uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier);
-	case g_io_stream_paramType::Binary:
+			(uint32_t)io.mods & (uint32_t)StreamMods::CapitalModifier);
+	case StreamParamType::Binary:
 		return dataToBinaryString(buffer, bufferSize, &integer, sizeof(T));
 	}
 
 	throw std::runtime_error("Unsupported io stream modifier in integerToString used.");
 }
 
-static size_t realNumberToString(double const& number, char* const buffer, size_t bufferSize, const g_io_stream& io, int expCutoff)
+static size_t realNumberToString(double const& number, char* const buffer, size_t bufferSize, const Stream& io, int expCutoff)
 {
 	switch (io.type)
 	{
 		// Default to fixed point
-	case g_io_stream_paramType::None:
-	case g_io_stream_paramType::FixedPoint:
+	case StreamParamType::None:
+	case StreamParamType::FixedPoint:
 		break;
-	case g_io_stream_paramType::ExponentNotation:
+	case StreamParamType::ExponentNotation:
 		expCutoff = 0;
 		break;
-	case g_io_stream_paramType::GeneralFormat:
+	case StreamParamType::GeneralFormat:
 		// TODO: Arbitrary precision here
 		break;
 	default:
@@ -939,7 +931,7 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 	}
 
 	// Round if needed
-	if (passedDecimal && g_io_isDigit(*(bufferPtr - 1)) && g_io_toNumber(*(bufferPtr - 1)) >= 5)
+	if (passedDecimal && IO::isDigit(*(bufferPtr - 1)) && IO::toNumber(*(bufferPtr - 1)) >= 5)
 	{
 		// Round all digits up by 1 until we can't
 		int carry = 1;
@@ -950,7 +942,7 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 				continue;
 			}
 
-			int oldNumber = g_io_toNumber(buffer[i]);
+			int oldNumber = IO::toNumber(buffer[i]);
 			int newNumber = oldNumber + carry;
 			bool shouldBreak = oldNumber < 5;
 			if (newNumber >= 10)
@@ -985,235 +977,141 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 
 // Adapted from https://stackoverflow.com/a/7097567
 template<>
-g_io_stream& operator<<(g_io_stream& io, float const& number)
+Stream& operator<<(Stream& io, float const& number)
 {
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
 	size_t length = realNumberToString((double)number, buffer, bufferSize, io, 5);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_float_prefix(io), _g_io_get_float_prefix_size(io), io);
+	IO::printFormattedString(buffer, length, IO::getFloatPrefix(io), IO::getFloatPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, double const& number)
+Stream& operator<<(Stream& io, double const& number)
 {
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
 	size_t length = realNumberToString(number, buffer, bufferSize, io, 5);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_float_prefix(io), _g_io_get_float_prefix_size(io), io);
+	IO::printFormattedString(buffer, length, IO::getFloatPrefix(io), IO::getFloatPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, int8_t const& integer)
+Stream& operator<<(Stream& io, int8_t const& integer)
 {
-	char buffer[maxIntegerBufferSize];
-	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, int16_t const& integer)
+Stream& operator<<(Stream& io, int16_t const& integer)
 {
-	char buffer[maxIntegerBufferSize];
-	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, int32_t const& integer)
+Stream& operator<<(Stream& io, int32_t const& integer)
 {
-	char buffer[maxIntegerBufferSize];
-	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, int64_t const& integer)
+Stream& operator<<(Stream& io, int64_t const& integer)
 {
-	char buffer[maxIntegerBufferSize];
-	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, uint8_t const& integer)
+Stream& operator<<(Stream& io, uint8_t const& integer)
 {
-	char buffer[maxIntegerBufferSize];
-	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, uint16_t const& integer)
+Stream& operator<<(Stream& io, uint16_t const& integer)
 {
-	char buffer[maxIntegerBufferSize];
-	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, uint32_t const& integer)
+Stream& operator<<(Stream& io, uint32_t const& integer)
 {
-	char buffer[maxIntegerBufferSize];
-	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, uint64_t const& integer)
+Stream& operator<<(Stream& io, uint64_t const& integer)
 {
-	char buffer[maxIntegerBufferSize];
-	size_t length = integerToString(buffer, maxIntegerBufferSize, integer, io);
-	_g_io_print_string_formatted(buffer, length, _g_io_get_int_prefix(io), _g_io_get_int_prefix_size(io), io);
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, g_DumbString const& dumbString)
+Stream& operator<<(Stream& io, BasicString const& dumbString)
 {
-	_g_io_print_string_formatted((const char*)dumbString.data, dumbString.numBytes, "", 0, io);
+	IO::printFormattedString((const char*)dumbString.data, dumbString.numBytes, "", 0, io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, const char* const& s)
+Stream& operator<<(Stream& io, const char* const& s)
 {
-	_g_io_print_string_formatted((const char*)s, std::strlen((const char*)s), "", 0, io);
+	IO::printFormattedString((const char*)s, std::strlen((const char*)s), "", 0, io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, char* const& s)
+Stream& operator<<(Stream& io, unsigned char* const& s)
 {
-	_g_io_print_string_formatted((const char*)s, std::strlen((const char*)s), "", 0, io);
+	IO::printFormattedString((const char*)s, std::strlen((const char*)s), "", 0, io);
 	return io;
 }
 
 template<>
-g_io_stream& operator<<(g_io_stream& io, std::string const& str)
+Stream& operator<<(Stream& io, char* const& s)
 {
-	_g_io_print_string_formatted((const char*)str.c_str(), str.size(), "", 0, io);
+	IO::printFormattedString((const char*)s, std::strlen((const char*)s), "", 0, io);
 	return io;
 }
+
+template<>
+Stream& operator<<(Stream& io, std::string const& str)
+{
+	IO::printFormattedString((const char*)str.c_str(), str.size(), "", 0, io);
+	return io;
+}
+
+namespace CppUtils { namespace IO {
 
 // ------ Internal functions ------
-static void _g_io_print_string_formatted(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const g_io_stream& io)
+static const char* getIntPrefix(const Stream& io)
 {
-	if (prefixLength > 0)
-	{
-		_g_io_printf_internal(prefix, prefixLength);
-	}
-
-	auto numCharsInContent = g_dumbString_utf8Length(content, contentLength);
-	if (!numCharsInContent.hasValue())
-	{
-		throw std::runtime_error("Tried to print invalid UTF8 string in printf.");
-	}
-	size_t totalContentLength = prefixLength + numCharsInContent.value();
-	uint32_t leftPadding = 0;
-	uint32_t rightPadding = 0;
-	if (io.width != 0)
-	{
-		switch (io.alignment)
-		{
-		case g_io_stream_align::Left:
-		{
-			if (io.width > totalContentLength)
-			{
-				rightPadding = (uint32_t)(io.width - totalContentLength);
-			}
-		}
-		break;
-		case g_io_stream_align::Right:
-		{
-			if (io.width > totalContentLength)
-			{
-				leftPadding = (uint32_t)(io.width - totalContentLength);
-			}
-		}
-		break;
-		case g_io_stream_align::Center:
-		{
-			if (io.width > totalContentLength)
-			{
-				leftPadding = (uint32_t)((io.width - totalContentLength) / 2);
-				// Since integer division can truncate, rightPadding will just
-				// take whatever's left
-				rightPadding = (uint32_t)(io.width - totalContentLength - leftPadding);
-			}
-		}
-		break;
-		}
-	}
-
-	// Only allocate scratch memory if needed
-	uint8_t numBytesInChar = 1;
-	if (io.fillCharacter >= 0xFF'FF'FF)
-	{
-		numBytesInChar = 4;
-	}
-	else if (io.fillCharacter >= 0xFF'FF)
-	{
-		numBytesInChar = 3;
-	}
-	else if (io.fillCharacter >= 0xFF)
-	{
-		numBytesInChar = 2;
-	}
-
-	constexpr size_t smallStringBufferSize = 32;
-	char smallStringBuffer[smallStringBufferSize];
-	char* scratchMemory = (leftPadding + rightPadding) * numBytesInChar > smallStringBufferSize
-		? (char*)malloc(sizeof(char) * (leftPadding + rightPadding) * numBytesInChar)
-		: smallStringBuffer;
-	if (leftPadding > 0)
-	{
-		for (size_t i = 0; i < leftPadding; i++)
-		{
-			for (size_t j = 0; j < numBytesInChar; j++)
-			{
-				scratchMemory[(i * numBytesInChar) + j] = (uint8_t)((io.fillCharacter >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
-			}
-		}
-
-		_g_io_printf_internal(scratchMemory, leftPadding * numBytesInChar);
-	}
-
-	_g_io_printf_internal(content, contentLength);
-
-	if (rightPadding > 0)
-	{
-		for (size_t i = leftPadding; i < rightPadding; i++)
-		{
-			for (size_t j = 0; j < numBytesInChar; j++)
-			{
-				scratchMemory[i] = (uint8_t)((io.fillCharacter >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
-			}
-		}
-
-		_g_io_printf_internal(scratchMemory, rightPadding * numBytesInChar);
-	}
-
-	if ((leftPadding + rightPadding) * numBytesInChar > smallStringBufferSize)
-	{
-		free(scratchMemory);
-	}
-}
-
-static const char* _g_io_get_int_prefix(const g_io_stream& io)
-{
-	bool isCaps = (uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier;
+	bool isCaps = (uint32_t)io.mods & (uint32_t)StreamMods::CapitalModifier;
 	switch (io.type)
 	{
-	case g_io_stream_paramType::Binary:
+	case StreamParamType::Binary:
 	{
 		if (isCaps)
 		{
@@ -1221,7 +1119,7 @@ static const char* _g_io_get_int_prefix(const g_io_stream& io)
 		}
 		return "0b";
 	}
-	case g_io_stream_paramType::Octal:
+	case StreamParamType::Octal:
 	{
 		if (isCaps)
 		{
@@ -1229,7 +1127,7 @@ static const char* _g_io_get_int_prefix(const g_io_stream& io)
 		}
 		return "0c";
 	}
-	case g_io_stream_paramType::Hexadecimal:
+	case StreamParamType::Hexadecimal:
 	{
 		if (isCaps)
 		{
@@ -1242,27 +1140,27 @@ static const char* _g_io_get_int_prefix(const g_io_stream& io)
 	}
 }
 
-static size_t _g_io_get_int_prefix_size(const g_io_stream& io)
+static size_t getIntPrefixSize(const Stream& io)
 {
 	switch (io.type)
 	{
-	case g_io_stream_paramType::Binary:
+	case StreamParamType::Binary:
 		return sizeof("0b") - 1;
-	case g_io_stream_paramType::Octal:
+	case StreamParamType::Octal:
 		return sizeof("0c") - 1;
-	case g_io_stream_paramType::Hexadecimal:
+	case StreamParamType::Hexadecimal:
 		return sizeof("0x") - 1;
 	default:
 		return sizeof("") - 1;
 	}
 }
 
-static const char* _g_io_get_float_prefix(const g_io_stream& io)
+static const char* getFloatPrefix(const Stream& io)
 {
-	bool isCaps = (uint32_t)io.mods & (uint32_t)g_io_stream_mods::CapitalModifier;
+	bool isCaps = (uint32_t)io.mods & (uint32_t)StreamMods::CapitalModifier;
 	switch (io.type)
 	{
-	case g_io_stream_paramType::FloatHexadecimal:
+	case StreamParamType::FloatHexadecimal:
 	{
 		if (isCaps)
 		{
@@ -1275,21 +1173,55 @@ static const char* _g_io_get_float_prefix(const g_io_stream& io)
 	}
 }
 
-static size_t _g_io_get_float_prefix_size(const g_io_stream& io)
+static size_t getFloatPrefixSize(const Stream& io)
 {
 	switch (io.type)
 	{
-	case g_io_stream_paramType::FloatHexadecimal:
+	case StreamParamType::FloatHexadecimal:
 		return sizeof("0x") - 1;
 	default:
 		return sizeof("") - 1;
 	}
 }
+
+static int32_t parseNextInteger(const char* str, size_t length, size_t* numCharactersParsed)
+{
+	size_t cursor = 0;
+
+	// Keep parsing until we hit length or a non-integer-digit
+	while (cursor < length && isDigit(str[cursor]))
+	{
+		cursor++;
+	}
+
+	*numCharactersParsed = cursor;
+	if (cursor == 0)
+	{
+		// No digits parsed, this failed to parse a number so early exit to avoid
+		// buffer overflows in the next function
+		return 0;
+	}
+
+	int32_t multiplier = 1;
+	int32_t result = 0;
+	for (int i = (int)(cursor - 1); i >= 0; i--)
+	{
+		// TODO: Do something to handle overflow here
+		result += (multiplier * toNumber(str[i]));
+		multiplier *= 10;
+	}
+
+	return result;
+}
+
+} } // End CppUtils::io
 
 // -------------------- Platform --------------------
 #ifdef _WIN32
 
 #include <Windows.h>
+
+namespace CppUtils { namespace IO {
 
 static HANDLE stdoutHandle = NULL;
 static bool writingDirectlyToConsole = false;
@@ -1374,12 +1306,12 @@ static void initializeStdoutIfNecessary()
 	}
 }
 
-void g_io_printf(const char* s)
+void printf(const char* s)
 {
-	_g_io_printf_internal(s, std::strlen(s));
+	_printfInternal(s, std::strlen(s));
 }
 
-void _g_io_printf_internal(const char* s, size_t length)
+void _printfInternal(const char* s, size_t length)
 {
 	initializeStdoutIfNecessary();
 	if (length <= MAXDWORD)
@@ -1411,14 +1343,121 @@ void _g_io_printf_internal(const char* s, size_t length)
 	}
 }
 
+void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io)
+{
+	if (prefixLength > 0)
+	{
+		_printfInternal(prefix, prefixLength);
+	}
+
+	auto numCharsInContent = String::utf8Length(content, contentLength);
+	if (!numCharsInContent.hasValue())
+	{
+		throw std::runtime_error("Tried to print invalid UTF8 string in printf.");
+	}
+	size_t totalContentLength = prefixLength + numCharsInContent.value();
+	uint32_t leftPadding = 0;
+	uint32_t rightPadding = 0;
+	if (io.width != 0)
+	{
+		switch (io.alignment)
+		{
+		case StreamAlign::Left:
+		{
+			if (io.width > totalContentLength)
+			{
+				rightPadding = (uint32_t)(io.width - totalContentLength);
+			}
+		}
+		break;
+		case StreamAlign::Right:
+		{
+			if (io.width > totalContentLength)
+			{
+				leftPadding = (uint32_t)(io.width - totalContentLength);
+			}
+		}
+		break;
+		case StreamAlign::Center:
+		{
+			if (io.width > totalContentLength)
+			{
+				leftPadding = (uint32_t)((io.width - totalContentLength) / 2);
+				// Since integer division can truncate, rightPadding will just
+				// take whatever's left
+				rightPadding = (uint32_t)(io.width - totalContentLength - leftPadding);
+			}
+		}
+		break;
+		}
+	}
+
+	// Only allocate scratch memory if needed
+	uint8_t numBytesInChar = 1;
+	if (io.fillCharacter >= 0xFF'FF'FF)
+	{
+		numBytesInChar = 4;
+	}
+	else if (io.fillCharacter >= 0xFF'FF)
+	{
+		numBytesInChar = 3;
+	}
+	else if (io.fillCharacter >= 0xFF)
+	{
+		numBytesInChar = 2;
+	}
+
+	constexpr size_t smallStringBufferSize = 32;
+	char smallStringBuffer[smallStringBufferSize];
+	char* scratchMemory = (leftPadding + rightPadding) * numBytesInChar > smallStringBufferSize
+		? (char*)malloc(sizeof(char) * (leftPadding + rightPadding) * numBytesInChar)
+		: smallStringBuffer;
+	if (leftPadding > 0)
+	{
+		for (size_t i = 0; i < leftPadding; i++)
+		{
+			for (size_t j = 0; j < numBytesInChar; j++)
+			{
+				scratchMemory[(i * numBytesInChar) + j] = (uint8_t)((io.fillCharacter >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
+			}
+		}
+
+		_printfInternal(scratchMemory, leftPadding * numBytesInChar);
+	}
+
+	_printfInternal(content, contentLength);
+
+	if (rightPadding > 0)
+	{
+		for (size_t i = leftPadding; i < rightPadding; i++)
+		{
+			for (size_t j = 0; j < numBytesInChar; j++)
+			{
+				scratchMemory[i] = (uint8_t)((io.fillCharacter >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
+			}
+		}
+
+		_printfInternal(scratchMemory, rightPadding * numBytesInChar);
+	}
+
+	if ((leftPadding + rightPadding) * numBytesInChar > smallStringBufferSize)
+	{
+		free(scratchMemory);
+	}
+}
+
+} } // End CppUtils::io
+
 #else // end _WIN32
 
-void g_io_printf(const char* s)
+namespace CppUtils { namespace IO {
+
+void printf(const char* s)
 {
 	std::cout << s;
 }
 
-void _g_io_printf_internal(const char* s, size_t length)
+void _printfInternal(const char* s, size_t length)
 {
 	if (length >= 0 && length <= INT32_MAX)
 	{
@@ -1430,6 +1469,8 @@ void _g_io_printf_internal(const char* s, size_t length)
 		throw new std::runtime_error(errorMessage.c_str());
 	}
 }
+
+} } // End CppUtils::io
 
 #endif // end PLATFORM_IMPLS
 
