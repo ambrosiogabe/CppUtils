@@ -16,7 +16,9 @@ using namespace CppUtils;
 
 #include <cppUtils/cppMaybe.hpp>
 
-// -------------------- Tests --------------------
+// -------------------- String Test Suite --------------------
+namespace StringTestSuite
+{
 DEFINE_TEST(utf8String_C080_ShouldBeBad)
 {
 	const uint8_t invalidUtf8Data[] = { 0xc0, 0x80, 0x00 };
@@ -90,6 +92,87 @@ void setupCppStringsTestSuite()
 	ADD_TEST(testSuite, validUtf8String_ShouldSucceed);
 	ADD_TEST(testSuite, validUtf8String_ShouldSucceedWithUnicodeChars);
 }
+}
+
+// -------------------- Maybe Test Suite --------------------
+namespace MaybeTestSuite
+{
+DEFINE_TEST(dummy)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+void setupMaybeTestSuite()
+{
+	Tests::TestSuite& testSuite = Tests::addTestSuite("cppMaybe.hpp");
+
+	ADD_TEST(testSuite, dummy);
+}
+}
+
+// -------------------- Print Test Suite --------------------
+namespace PrintTestSuite
+{
+
+DEFINE_TEST(dummy)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+void setupPrintTestSuite()
+{
+	Tests::TestSuite& testSuite = Tests::addTestSuite("cppPrint.hpp");
+
+	ADD_TEST(testSuite, dummy);
+}
+
+}
+
+// -------------------- Thread Pool Test Suite --------------------
+namespace ThreadPoolTestSuite
+{
+
+DEFINE_TEST(dummy)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+void setupThreadPoolTestSuite()
+{
+	Tests::TestSuite& testSuite = Tests::addTestSuite("cppThreadPool.hpp");
+
+	ADD_TEST(testSuite, dummy);
+}
+
+}
+
+// -------------------- Utils Test Suite --------------------
+namespace CppUtilsTestSuite
+{
+
+DEFINE_TEST(dummy)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+void setupCppUtilsTestSuite()
+{
+	Tests::TestSuite& testSuite = Tests::addTestSuite("cppUtils.hpp");
+
+	ADD_TEST(testSuite, dummy);
+}
+
+}
+
+using namespace StringTestSuite;
+using namespace MaybeTestSuite;
+using namespace PrintTestSuite;
+using namespace ThreadPoolTestSuite;
+using namespace CppUtilsTestSuite;
 
 // I'm purposely leaking memory and don't want to be warned to see if my
 // library catches it so we disable warnings about unreferenced vars
@@ -102,8 +185,11 @@ void mainFunc()
 	g_logger_set_log_directory("C:/dev/C++/CppUtils/logs");
 	g_memory_init_padding(true, 1024);
 
-
 	setupCppStringsTestSuite();
+	setupMaybeTestSuite();
+	setupPrintTestSuite();
+	setupThreadPoolTestSuite();
+	setupCppUtilsTestSuite();
 
 	Tests::runTests();
 	Tests::free();
