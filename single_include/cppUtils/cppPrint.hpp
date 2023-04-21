@@ -1415,6 +1415,14 @@ int CALLBACK win32FontExistsCallback(const LOGFONTW*, const TEXTMETRICW*, DWORD,
 
 static void initializeStdoutIfNecessary()
 {
+	// NOTE: Check if the user may have re-assigned the stdout handle. If they have
+	//       then we'll reinitialize the file/console to the defaults.
+	HANDLE currentStdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (stdoutHandle != NULL && currentStdoutHandle != stdoutHandle)
+	{
+		stdoutHandle = NULL;
+	}
+
 	if (stdoutHandle == NULL)
 	{
 		stdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -1428,36 +1436,6 @@ static void initializeStdoutIfNecessary()
 			throw std::runtime_error("Cannot acquire a STD_OUTPUT_HANDLE. Current device does not support stdout.");
 		}
 
-		// Get original console info in case we need to reset colors
-		{
-			originalConsoleInfo = {};
-			originalConsoleInfo.cbSize = sizeof(CONSOLE_SCREEN_BUFFER_INFOEX);
-			GetConsoleScreenBufferInfoEx(stdoutHandle, &originalConsoleInfo);
-
-			// Setup a nicer color palette
-			originalConsoleInfo.ColorTable[0]  = 0x00'05'05'05; // Black
-			originalConsoleInfo.ColorTable[1]  = 0x00'99'37'2E; // Dark Blue
-			originalConsoleInfo.ColorTable[2]  = 0x00'37'8A'2C; // Dark Green
-			originalConsoleInfo.ColorTable[3]  = 0x00'A3'99'2C; // Dark Cyan
-			originalConsoleInfo.ColorTable[4]  = 0x00'24'2C'85; // Dark Red
-			originalConsoleInfo.ColorTable[5]  = 0x00'56'24'01; // Dark Magenta (Powershell Blue)
-			originalConsoleInfo.ColorTable[6]  = 0x00'2B'B1'BD; // Dark Yellow
-			originalConsoleInfo.ColorTable[7]  = 0x00'61'61'61; // Dark Gray
-			originalConsoleInfo.ColorTable[8]  = 0x00'B0'B0'B0; // Gray
-			originalConsoleInfo.ColorTable[9]  = 0x00'EB'83'5E; // Blue
-			originalConsoleInfo.ColorTable[10] = 0x00'5E'CC'67; // Green
-			originalConsoleInfo.ColorTable[11] = 0x00'DE'DC'66; // Cyan
-			originalConsoleInfo.ColorTable[12] = 0x00'66'70'DE; // Red
-			originalConsoleInfo.ColorTable[13] = 0x00'E6'67'B3; // Magenta
-			originalConsoleInfo.ColorTable[14] = 0x00'72'EC'F2; // Yellow
-			originalConsoleInfo.ColorTable[15] = 0x00'FF'FF'FF; // White
-
-			WORD backgroundColor = originalConsoleInfo.wAttributes & 0xF0;
-			originalConsoleInfo.wAttributes = backgroundColor | consoleColorToForegroundColor(ConsoleColor::WHITE);
-
-			SetConsoleScreenBufferInfoEx(stdoutHandle, &originalConsoleInfo);
-		}
-
 		// Are we printing to the console or redirecting through a pipe?
 		DWORD _mode;
 		BOOL consoleModeRes = GetConsoleMode(stdoutHandle, &_mode);
@@ -1465,6 +1443,36 @@ static void initializeStdoutIfNecessary()
 
 		if (writingDirectlyToConsole)
 		{
+			// Get original console info in case we need to reset colors
+			{
+				originalConsoleInfo = {};
+				originalConsoleInfo.cbSize = sizeof(CONSOLE_SCREEN_BUFFER_INFOEX);
+				GetConsoleScreenBufferInfoEx(stdoutHandle, &originalConsoleInfo);
+
+				// Setup a nicer color palette
+				originalConsoleInfo.ColorTable[0] = 0x00'05'05'05; // Black
+				originalConsoleInfo.ColorTable[1] = 0x00'99'37'2E; // Dark Blue
+				originalConsoleInfo.ColorTable[2] = 0x00'37'8A'2C; // Dark Green
+				originalConsoleInfo.ColorTable[3] = 0x00'A3'99'2C; // Dark Cyan
+				originalConsoleInfo.ColorTable[4] = 0x00'24'2C'85; // Dark Red
+				originalConsoleInfo.ColorTable[5] = 0x00'56'24'01; // Dark Magenta (Powershell Blue)
+				originalConsoleInfo.ColorTable[6] = 0x00'2B'B1'BD; // Dark Yellow
+				originalConsoleInfo.ColorTable[7] = 0x00'61'61'61; // Dark Gray
+				originalConsoleInfo.ColorTable[8] = 0x00'B0'B0'B0; // Gray
+				originalConsoleInfo.ColorTable[9] = 0x00'EB'83'5E; // Blue
+				originalConsoleInfo.ColorTable[10] = 0x00'5E'CC'67; // Green
+				originalConsoleInfo.ColorTable[11] = 0x00'DE'DC'66; // Cyan
+				originalConsoleInfo.ColorTable[12] = 0x00'66'70'DE; // Red
+				originalConsoleInfo.ColorTable[13] = 0x00'E6'67'B3; // Magenta
+				originalConsoleInfo.ColorTable[14] = 0x00'72'EC'F2; // Yellow
+				originalConsoleInfo.ColorTable[15] = 0x00'FF'FF'FF; // White
+
+				WORD backgroundColor = originalConsoleInfo.wAttributes & 0xF0;
+				originalConsoleInfo.wAttributes = backgroundColor | consoleColorToForegroundColor(ConsoleColor::WHITE);
+
+				SetConsoleScreenBufferInfoEx(stdoutHandle, &originalConsoleInfo);
+			}
+
 			DWORD nfont = 0;
 			COORD fontSize = GetConsoleFontSize(stdoutHandle, nfont);
 
@@ -1511,10 +1519,42 @@ static void initializeStdoutIfNecessary()
 					throw std::runtime_error("Failed to find suitable font for console.");
 				}
 			}
+
+			return;
 		}
 
-		// TODO: If we're not writing directly to console then check if the file we are writing to is
-		//       new. If it is new, then write the BOM prefix for the file to specify this is UTF-8.
+		DWORD fileType = GetFileType(stdoutHandle);
+		if (fileType == FILE_TYPE_PIPE)
+		{
+			// If we're writing to a pipe, nothing needs to be done
+			return;
+		}
+
+		if (fileType == FILE_TYPE_UNKNOWN)
+		{
+			throw std::runtime_error("Cannot write to stdout. Stdout is directed at an unknown FILE_TYPE.");
+		}
+
+		// NOTE: We're writing to a file here, check if it's a new file or not
+		//       and write the BOM if it's a new file.
+		LARGE_INTEGER fileSize;
+		if (GetFileSizeEx(stdoutHandle, &fileSize) == 0)
+		{
+			DWORD errorCode = GetLastError();
+			throw std::runtime_error(("Stdout points to an invalid file." + std::to_string(errorCode)).c_str());
+		}
+
+		if (fileSize.QuadPart == 0)
+		{
+			const uint8_t utf8Bom[] = { 0xEF, 0xBB, 0xBF };
+			DWORD numCharsWritten;
+			WriteFile(stdoutHandle, utf8Bom, sizeof(utf8Bom), &numCharsWritten, NULL);
+
+			if (numCharsWritten != sizeof(utf8Bom))
+			{
+				throw std::runtime_error("Failed to write file BOM for stdout.");
+			}
+		}
 	}
 }
 
@@ -1558,7 +1598,12 @@ void _printfInternal(const char* s, size_t length)
 		DWORD numCharsWritten;
 		if (!writingDirectlyToConsole)
 		{
-			WriteFile(stdoutHandle, s, (DWORD)length, &numCharsWritten, NULL);
+			BOOL fileWriteRes = WriteFile(stdoutHandle, s, (DWORD)length, &numCharsWritten, NULL);
+			if (fileWriteRes == 0)
+			{
+				DWORD error = GetLastError();
+				throw std::runtime_error(("Failed to write to stdout. Error code: " + std::to_string(error)).c_str());
+			}
 		}
 		else
 		{
@@ -1571,7 +1616,7 @@ void _printfInternal(const char* s, size_t length)
 
 		if (numCharsWritten != numCharsInString)
 		{
-			throw std::runtime_error("Failed to write to stdout. OOM or something idk.");
+			throw std::runtime_error("Failed to write to stdout.");
 		}
 	}
 	else
@@ -1583,7 +1628,7 @@ void _printfInternal(const char* s, size_t length)
 
 void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io)
 {
-	if (prefixLength > 0)
+	if (prefixLength > 0 && ((uint8_t)io.mods & (uint8_t)StreamMods::AltFormat))
 	{
 		_printfInternal(prefix, prefixLength);
 	}

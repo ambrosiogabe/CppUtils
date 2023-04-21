@@ -2,6 +2,8 @@
 #define GABE_CPP_UTILS_TESTS_H
 
 #define ADD_TEST(testSuite, testName) Tests::addTest(testSuite, #testName, testName)
+#define ADD_BEFORE_EACH(testSuite, testName) Tests::setBeforeEach(testSuite, #testName, testName)
+#define ADD_AFTER_EACH(testSuite, testName) Tests::setAfterEach(testSuite, #testName, testName)
 
 #define ASSERT_TRUE(val) { if (!(val)) return u8"ASSERT_TRUE("#val")"; }
 #define ASSERT_FALSE(val) { if (val) return u8"ASSERT_FALSE("#val")"; }
@@ -15,6 +17,12 @@
 #define DEFINE_TEST(fnName) const char* fnName()
 #define END_TEST return nullptr
 
+#define DEFINE_BEFORE_EACH(fnName) const char* fnName()
+#define END_BEFORE_EACH return nullptr
+
+#define DEFINE_AFTER_EACH(fnName) const char* fnName()
+#define END_AFTER_EACH return nullptr 
+
 namespace CppUtils
 {
 namespace Tests
@@ -26,6 +34,9 @@ typedef const char* (*TestFn)();
 TestSuite& addTestSuite(const char* testSuiteName);
 
 void addTest(TestSuite& testSuite, const char* testName, TestFn fn);
+
+void setBeforeEach(TestSuite& testSuite, const char* testName, TestFn fn);
+void setAfterEach(TestSuite& testSuite, const char* testName, TestFn fn);
 
 void runTests();
 
@@ -54,6 +65,7 @@ namespace Tests
 // ----------------- Internal structures -----------------
 struct TestPrototype
 {
+	char* testResult;
 	uint8_t* name;
 	size_t nameLength;
 	TestFn fn;
@@ -62,10 +74,12 @@ struct TestPrototype
 struct TestSuite
 {
 	const char* name;
-	char** testResults;
 	TestPrototype* tests;
 	size_t testsLength;
 	size_t numTestsPassed;
+
+	TestPrototype beforeEach = {};
+	TestPrototype afterEach = {};
 };
 
 // ----------------- Internal variables -----------------
@@ -74,6 +88,8 @@ static std::vector<TestSuite> testSuites = {};
 // ----------------- Internal functions -----------------
 static void runTestSuite(void* testSuiteRaw, size_t testSuiteSize);
 static void printTestSuiteResCallback(void* testSuiteRaw, size_t testSuiteSize);
+static TestPrototype createTestPrototype(const char* testName, TestFn fn);
+static void freeTestPrototype(TestPrototype& test);
 
 TestSuite& addTestSuite(const char* testSuiteName)
 {
@@ -81,7 +97,6 @@ TestSuite& addTestSuite(const char* testSuiteName)
 	res.name = testSuiteName;
 	res.numTestsPassed = 0;
 	res.tests = nullptr;
-	res.testResults = nullptr;
 	res.testsLength = 0;
 	testSuites.push_back(res);
 
@@ -95,20 +110,19 @@ void addTest(TestSuite& testSuite, const char* testName, TestFn fn)
 		testSuite.tests,
 		sizeof(TestPrototype) * testSuite.testsLength
 	);
-	testSuite.testResults = (char**)g_memory_realloc(
-		testSuite.testResults,
-		sizeof(char**) * testSuite.testsLength
-	);
 
-	TestPrototype test = {};
-	test.fn = fn;
-	test.nameLength = std::strlen(testName);
-	test.name = (uint8*)g_memory_allocate(sizeof(uint8) * (test.nameLength + 1));
-	g_memory_copyMem(test.name, (void*)testName, sizeof(uint8) * test.nameLength);
-	test.name[test.nameLength] = '\0';
-
+	TestPrototype test = createTestPrototype(testName, fn);
 	testSuite.tests[testSuite.testsLength - 1] = test;
-	testSuite.testResults[testSuite.testsLength - 1] = nullptr;
+}
+
+void setBeforeEach(TestSuite& testSuite, const char* testName, TestFn fn)
+{
+	testSuite.beforeEach = createTestPrototype(testName, fn);
+}
+
+void setAfterEach(TestSuite& testSuite, const char* testName, TestFn fn)
+{
+	testSuite.afterEach = createTestPrototype(testName, fn);
 }
 
 void runTests()
@@ -175,19 +189,7 @@ void free()
 	{
 		for (size_t i = 0; i < testSuite.testsLength; i++)
 		{
-			if (testSuite.tests[i].name)
-			{
-				g_memory_free(testSuite.tests[i].name);
-			}
-
-			if (testSuite.testResults[i])
-			{
-				g_memory_free(testSuite.testResults[i]);
-			}
-
-			testSuite.tests[i].name = nullptr;
-			testSuite.tests[i].nameLength = 0;
-			testSuite.tests[i].fn = nullptr;
+			freeTestPrototype(testSuite.tests[i]);
 		}
 
 		if (testSuite.tests)
@@ -195,13 +197,10 @@ void free()
 			g_memory_free(testSuite.tests);
 		}
 
-		if (testSuite.testResults)
-		{
-			g_memory_free(testSuite.testResults);
-		}
+		freeTestPrototype(testSuite.beforeEach);
+		freeTestPrototype(testSuite.afterEach);
 
 		testSuite.tests = nullptr;
-		testSuite.testResults = nullptr;
 		testSuite.numTestsPassed = 0;
 		testSuite.name = nullptr;
 		testSuite.testsLength = 0;
@@ -218,17 +217,27 @@ static void runTestSuite(void* testSuiteRaw, size_t testSuiteSize)
 
 	for (size_t i = 0; i < testSuite->testsLength; i++)
 	{
+		if (testSuite->beforeEach.fn)
+		{
+			testSuite->beforeEach.fn();
+		}
+
 		const char* result = testSuite->tests[i].fn();
 		if (result == nullptr)
 		{
 			testSuite->numTestsPassed++;
-			testSuite->testResults[i] = nullptr;
+			testSuite->tests[i].testResult = nullptr;
 		}
 		else
 		{
 			size_t strLength = std::strlen(result) + 1;
-			testSuite->testResults[i] = (char*)g_memory_allocate(sizeof(char) * strLength);
-			g_memory_copyMem(testSuite->testResults[i], (void*)result, strLength);
+			testSuite->tests[i].testResult = (char*)g_memory_allocate(sizeof(char) * strLength);
+			g_memory_copyMem(testSuite->tests[i].testResult, (void*)result, strLength);
+		}
+
+		if (testSuite->afterEach.fn)
+		{
+			testSuite->afterEach.fn();
 		}
 	}
 }
@@ -242,7 +251,7 @@ static void printTestSuiteResCallback(void* testSuiteRaw, size_t testSuiteSize)
 
 	for (size_t i = 0; i < testSuite->testsLength; i++)
 	{
-		if (testSuite->testResults[i] == nullptr)
+		if (testSuite->tests[i].testResult == nullptr)
 		{
 			IO::setForegroundColor(ConsoleColor::GREEN);
 			IO::printf(u8"      \u2713 Success ");
@@ -260,7 +269,7 @@ static void printTestSuiteResCallback(void* testSuiteRaw, size_t testSuiteSize)
 				testSuite->tests[i].name
 			);
 			IO::setForegroundColor(ConsoleColor::RED);
-			IO::printf("{}\n", testSuite->testResults[i]);
+			IO::printf("{}\n", testSuite->tests[i].testResult);
 			IO::resetColor();
 		}
 	}
@@ -284,6 +293,34 @@ static void printTestSuiteResCallback(void* testSuiteRaw, size_t testSuiteSize)
 	IO::setForegroundColor(ConsoleColor::YELLOW);
 	IO::printf("{}/{}\n\n", testSuite->numTestsPassed, testSuite->testsLength);
 	IO::resetColor();
+}
+
+static TestPrototype createTestPrototype(const char* testName, TestFn fn)
+{
+	TestPrototype test = {};
+	test.fn = fn;
+	test.nameLength = std::strlen(testName);
+	test.name = (uint8*)g_memory_allocate(sizeof(uint8) * (test.nameLength + 1));
+	g_memory_copyMem(test.name, (void*)testName, sizeof(uint8) * test.nameLength);
+	test.name[test.nameLength] = '\0';
+	return test;
+}
+
+static void freeTestPrototype(TestPrototype& test)
+{
+	if (test.name)
+	{
+		g_memory_free(test.name);
+	}
+
+	if (test.testResult)
+	{
+		g_memory_free(test.testResult);
+	}
+
+	test.name = nullptr;
+	test.nameLength = 0;
+	test.fn = nullptr;
 }
 
 }

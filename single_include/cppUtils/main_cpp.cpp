@@ -114,8 +114,149 @@ void setupMaybeTestSuite()
 // -------------------- Print Test Suite --------------------
 namespace PrintTestSuite
 {
+#include <Windows.h>
+#include <stdio.h>
+#include <io.h>
+#include <fcntl.h>
 
-DEFINE_TEST(dummy)
+static HANDLE pipeRead = NULL;
+static HANDLE pipeWrite = NULL;
+static char printBuffer[2048 * 10];
+static HANDLE oldStdoutHandle = INVALID_HANDLE_VALUE;
+static int oldCStdout = 0;
+static const char* stdoutFilename = "testOutput.txt";
+
+DEFINE_BEFORE_EACH(setupTest)
+{
+	oldStdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+
+	BOOL pipeCreateRes = CreatePipe(
+		&pipeRead,
+		&pipeWrite,
+		NULL,
+		sizeof(printBuffer)
+	);
+
+	if (pipeCreateRes == 0)
+	{
+		throw std::runtime_error("Failed to create stdout redirect pipe.");
+	}
+
+	oldCStdout = _dup(1);
+
+	int fd = _open_osfhandle((intptr_t)pipeWrite, _O_APPEND);
+	int res = _dup2(fd, 1);
+	if (res == -1)
+	{
+		throw std::runtime_error("Failed to redirect stdout to anonymous pipe.");
+	}
+	setvbuf(stdout, NULL, _IONBF, 0); //Disable buffering.
+
+	SetStdHandle(STD_OUTPUT_HANDLE, pipeWrite);
+
+	END_BEFORE_EACH;
+}
+
+DEFINE_AFTER_EACH(teardownTest)
+{
+	if (pipeRead != NULL)
+	{
+		CloseHandle(pipeRead);
+	}
+
+	if (pipeWrite != NULL)
+	{
+		CloseHandle(pipeWrite);
+	}
+
+	SetStdHandle(STD_OUTPUT_HANDLE, oldStdoutHandle);
+
+	int res = _dup2(oldCStdout, 1);
+	if (res == -1)
+	{
+		throw std::runtime_error("Failed to redirect stdout to anonymous pipe.");
+	}
+
+	END_AFTER_EACH;
+}
+
+static const char* compareMemory(const uint8_t* expectedOutput, size_t expectedOutputSize)
+{
+	DWORD numBytesRead;
+	BOOL res = ReadFile(
+		pipeRead,
+		(void*)&printBuffer[0],
+		sizeof(printBuffer),
+		&numBytesRead,
+		NULL
+	);
+
+	ASSERT_NOT_EQUAL(res, 0);
+	ASSERT_EQUAL(numBytesRead, expectedOutputSize * 2);
+
+	bool memoryIsAsExpected = g_memory_compareMem(
+		(uint8_t*)printBuffer, expectedOutputSize,
+		(uint8_t*)expectedOutput, expectedOutputSize
+	);
+	ASSERT_TRUE(memoryIsAsExpected);
+
+	bool memoryIsEqual = g_memory_compareMem(
+		(uint8_t*)printBuffer, expectedOutputSize,
+		(uint8_t*)printBuffer + expectedOutputSize, expectedOutputSize);
+	ASSERT_TRUE(memoryIsEqual);
+
+	return nullptr;
+}
+
+DEFINE_TEST(hexOutputIsSameAsPrintf)
+{
+	const std::vector<std::string> expectedOutputs = {
+		"0XABCD\n",
+		"0xabcd\n",
+		"abcd\n",
+		"0x0000ffcc\n"
+	};
+	const std::vector<std::string> cPrintfStatements = {
+		"%#6X\n",
+		"%#6x\n",
+		"%4x\n",
+		"%#010x\n"
+	};
+	const std::vector<std::string> printfStatements = {
+		"{:#6X}\n",
+		"{:#6x}\n",
+		"{:4x}\n",
+		"{0:#10x}\n"
+	};
+	uint32_t hexNumbers[] = {
+		0xABCD,
+		0xABCD,
+		0xabcd,
+		0xffcc
+	};
+
+	for (size_t i = 0; i < expectedOutputs.size(); i++)
+	{
+		printf(cPrintfStatements[i].c_str(), hexNumbers[i]);
+		IO::printf(printfStatements[i].c_str(), hexNumbers[i]);
+
+		const char* res = compareMemory((const uint8_t*)expectedOutputs[i].c_str(), expectedOutputs[i].length());
+		if (res) 
+		{
+			return res;
+		}
+	}
+
+	END_TEST;
+}
+
+DEFINE_TEST(failedToOpenStdoutFile)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+DEFINE_TEST(failedToCloseStdoutFile)
 {
 	ASSERT_TRUE(false);
 	END_TEST;
@@ -125,7 +266,10 @@ void setupPrintTestSuite()
 {
 	Tests::TestSuite& testSuite = Tests::addTestSuite("cppPrint.hpp");
 
-	ADD_TEST(testSuite, dummy);
+	ADD_BEFORE_EACH(testSuite, setupTest);
+	ADD_AFTER_EACH(testSuite, teardownTest);
+
+	ADD_TEST(testSuite, hexOutputIsSameAsPrintf);
 }
 
 }
@@ -275,18 +419,18 @@ void mainFunc()
 		);
 
 		g_logger_info("Testing some floats:\n"
-			"   INFINITE: {*:13}\n"
-			"  -INFINITE: {*:13}\n"
-			"        NAN: {*:13}\n"
-			"       0.32: {*:13.9f}\n"
-			" 1.2222239f: {*:13}\n"
-			"   1.999999: {*:13.3f}\n"
-			"        2.0: {*:13}\n"
-			"    2.00001: {*:13}\n"
-			"        0.0: {*:13}\n"
-			"    1.25e10: {*:13}\n"
-			"0.999999999: {*:13}\n"
-			"   1.25e-10: {*:13}",
+			u8"   INFINITE: {\u00b7:13}\n"
+			u8"  -INFINITE: {\u00b7:13}\n"
+			u8"        NAN: {\u00b7:13}\n"
+			u8"       0.32: {\u00b7:13.9f}\n"
+			u8" 1.2222239f: {\u00b7:13}\n"
+			u8"   1.999999: {\u00b7:13.3f}\n"
+			u8"        2.0: {\u00b7:13}\n"
+			u8"    2.00001: {\u00b7:13}\n"
+			u8"        0.0: {\u00b7:13}\n"
+			u8"    1.25e10: {\u00b7:13}\n"
+			u8"0.999999999: {\u00b7:13}\n"
+			u8"   1.25e-10: {\u00b7:13}",
 			(float)INFINITY,
 			-1.0f * (float)INFINITY,
 			NAN,
@@ -339,7 +483,8 @@ void mainFunc()
 			u8"      small-xi: \u03be \n"
 			u8"     small-phi: \u03C6 \n"
 			u8"special-quotes: \u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B \n"
-			u8"        arrows: \u2192 \u2190 \u2191 \u2193 \u2194 \u2195");
+			u8"        arrows: \u2192 \u2190 \u2191 \u2193 \u2194 \u2195 \n"
+			u8"        emojis: \U0001F600 \U0001F680 \U0001F4A9");
 	}
 
 	// Trying all the colors
@@ -361,6 +506,8 @@ void mainFunc()
 		IO::printf("\n");
 	}
 
+	g_logger_info("PI: {*:^10.2f}", 3.14f);
+
 	g_memory_dumpMemoryLeaks();
 
 	g_logger_assert(true, "We shouldn't see this.");
@@ -377,7 +524,8 @@ int main()
 	}
 	catch (std::exception ex)
 	{
-		printf("\n\nFailed with exception: %s\n", ex.what());
+		const char* er = ex.what();
+		printf("\n\nFailed with exception: %s\n", er);
 	}
 
 	return 0;
