@@ -318,11 +318,12 @@ DEFINE_TEST(binaryOutputIsSameAsPrintf)
 
 DEFINE_TEST(leftAlignIsCorrect)
 {
+	// Test left-alignment for strings
 	{
 		using TupleType = std::tuple<std::string, std::string, std::string, const char*>;
 		const std::vector<TupleType> tests = {
-			TupleType{ "    Hello World!\n", "%16s\n", "{:16}\n", "Hello World!" },
-			TupleType{ "Hello World!\n", "%8s\n", "{:8}\n", "Hello World!" },
+			TupleType{ "Hello World!    \n", "%-16s\n", "{:<16}\n", "Hello World!" },
+			TupleType{ "Hello World!\n", "%-8s\n", "{:<8}\n", "Hello World!" },
 		};
 
 		for (size_t i = 0; i < tests.size(); i++)
@@ -339,10 +340,37 @@ DEFINE_TEST(leftAlignIsCorrect)
 		}
 	}
 
+	// Test left-alignment for hex ints (and 0-padded hex ints)
 	{
 		using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
 		const std::vector<TupleType> tests = {
 			TupleType{ "0XABCD  \n", "%#-8X\n", "{:<#8X}\n", 0xABCD },
+			TupleType{ "0XABCD\n", "%#-3X\n", "{:<#3X}\n", 0xABCD },
+			TupleType{ "0XABCD  \n", "%#-8X\n", "{:<#8X}\n", 0xABCD },
+			TupleType{ "0XABCD\n", "%#-3X\n", "{:<#3X}\n", 0xABCD },
+			TupleType{ "0X00ABCD\n", "%#08X\n", "{:<#08X}\n", 0xABCD },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Test left-alignment for floats
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, float>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "1.123  \n", "%-7.3f\n", "{:<7.3f}\n", 1.123f },
+			TupleType{ "1.123\n", "%-2.3f\n", "{:<2.3f}\n", 1.123f },
 		};
 
 		for (size_t i = 0; i < tests.size(); i++)
