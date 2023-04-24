@@ -41,7 +41,7 @@
  Any fields marked with [] are optional, whereas fields marked with () are required. If no format is specified,
  for example if you specify something like print("{}"), then it will use all the default options.
 
-   format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
+   format_spec ::= [fill](":")[align][sign]["#"]("0")[width]["." precision][type]
    fill        ::= <any ASCII character other than "{" | "}" | ":">
    align       ::= "<" | ">" | "^"
    sign        ::= "+" | "-" | " "
@@ -66,6 +66,12 @@
 			   " " = " 3.12" "-3.12"
 			   "-" = "3.12" "-3.12"
 	  width: Minimum width for content to fill. Max width that can be used is UINT16_MAX.
+			 NOTE: Preceding the width field with a 0 will add 0's to the padding for hexadecimal/binary/octal
+			       digits after the prefix. It will also add the 0's after the sign for numbers.
+			 NOTE: Preceding the width with a "0" means the fill character will have no effect.
+			 NOTE: Preceding the width with a "0" forces the alignment to be right-aligned.
+			       "0X000ABCD" for {:#09X} vs "   0XABCD" for {:#9X}
+
   precision: Number of digits to show after decimal place. Defaults to 6. If the number is truncated
 			 it will be rounded to the next natural decimal place, for example 4.9999999 -> 5.000000
 			 for a precision of 6. Max precision that can be used is UINT16_MAX.
@@ -152,6 +158,7 @@ enum class StreamMods : uint32_t
 	PrecisionSet = 1 << 0,
 	CapitalModifier = 1 << 1,
 	AltFormat = 1 << 2,
+	UseZeroPadding = 1 << 3,
 };
 
 enum class StreamParamType : uint16_t
@@ -528,9 +535,21 @@ void Stream::parseModifiers(const char* modifiersStr, size_t length)
 		}
 	}
 
-	// Parse [width]
+	// Parse ("0")[width]
 	{
 		auto c = Parser::peek(parseInfo, &numBytesParsed);
+		if (!c.hasValue())
+		{
+			throw std::runtime_error("Invalid UTF8 string passed to printf.");
+		}
+
+		if (*c == '0')
+		{
+			this->mods = (StreamMods)((uint32_t)this->mods | (uint32_t)StreamMods::UseZeroPadding);
+			parseInfo.cursor += numBytesParsed;
+		}
+
+		c = Parser::peek(parseInfo, &numBytesParsed);
 		if (!c.hasValue())
 		{
 			throw std::runtime_error("Invalid UTF8 string passed to printf.");
@@ -1630,9 +1649,18 @@ void _printfInternal(const char* s, size_t length)
 
 void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io)
 {
-	if (prefixLength > 0 && ((uint8_t)io.mods & (uint8_t)StreamMods::AltFormat))
+	bool shouldUseZeroPadding = ((uint8_t)io.mods & (uint8_t)StreamMods::UseZeroPadding);
+	bool shouldUseAltFormat = ((uint8_t)io.mods & (uint8_t)StreamMods::AltFormat);
+	StreamAlign alignment = io.alignment;
+	uint32_t fillChar = io.fillCharacter;
+	if (prefixLength > 0 && shouldUseAltFormat && shouldUseZeroPadding)
 	{
+		// NOTE: If we're printing alt format and want to use 0's as padding,
+		//       print the prefix before anything else
+		//       We also force alignment to the right
 		_printfInternal(prefix, prefixLength);
+		alignment = StreamAlign::Right;
+		fillChar = '0';
 	}
 
 	auto numCharsInContent = String::utf8Length(content, contentLength);
@@ -1645,7 +1673,7 @@ void printFormattedString(const char* content, size_t contentLength, const char*
 	uint32_t rightPadding = 0;
 	if (io.width != 0)
 	{
-		switch (io.alignment)
+		switch (alignment)
 		{
 		case StreamAlign::Left:
 		{
@@ -1679,15 +1707,15 @@ void printFormattedString(const char* content, size_t contentLength, const char*
 
 	// Only allocate scratch memory if needed
 	uint8_t numBytesInChar = 1;
-	if (io.fillCharacter >= 0xFF'FF'FF)
+	if (fillChar >= 0xFF'FF'FF)
 	{
 		numBytesInChar = 4;
 	}
-	else if (io.fillCharacter >= 0xFF'FF)
+	else if (fillChar >= 0xFF'FF)
 	{
 		numBytesInChar = 3;
 	}
-	else if (io.fillCharacter >= 0xFF)
+	else if (fillChar >= 0xFF)
 	{
 		numBytesInChar = 2;
 	}
@@ -1703,13 +1731,19 @@ void printFormattedString(const char* content, size_t contentLength, const char*
 		{
 			for (size_t j = 0; j < numBytesInChar; j++)
 			{
-				scratchMemory[(i * numBytesInChar) + j] = (uint8_t)((io.fillCharacter >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
+				scratchMemory[(i * numBytesInChar) + j] = (uint8_t)((fillChar >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
 			}
 		}
 
 		_printfInternal(scratchMemory, leftPadding * numBytesInChar);
 	}
 
+	if (prefixLength > 0 && shouldUseAltFormat && !shouldUseZeroPadding)
+	{
+		// NOTE: If we're not using the zero padding, then we need to print the
+		//       prefix immediately before the content
+		_printfInternal(prefix, prefixLength);
+	}
 	_printfInternal(content, contentLength);
 
 	if (rightPadding > 0)
@@ -1718,7 +1752,7 @@ void printFormattedString(const char* content, size_t contentLength, const char*
 		{
 			for (size_t j = 0; j < numBytesInChar; j++)
 			{
-				scratchMemory[i] = (uint8_t)((io.fillCharacter >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
+				scratchMemory[i] = (uint8_t)((fillChar >> ((numBytesInChar - j - 1) * 8)) & 0xFF);
 			}
 		}
 

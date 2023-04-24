@@ -238,7 +238,7 @@ DEFINE_TEST(hexOutputIsSameAsPrintf)
 		TupleType{     "0XABCD\n",   "%#6X\n",   "{:#6X}\n", 0xABCD },
 		TupleType{     "0xabcd\n",   "%#6x\n",   "{:#6x}\n", 0xABCD },
 		TupleType{       "abcd\n",    "%4x\n",    "{:4x}\n", 0xabcd },
-		TupleType{ "0x0000ffcc\n", "%#010x\n", "{0:#10x}\n", 0xffcc }
+		TupleType{ "0x0000ffcc\n", "%#010x\n", "{:#010x}\n", 0xffcc }
 	};
 
 	for (size_t i = 0; i < tests.size(); i++)
@@ -318,7 +318,47 @@ DEFINE_TEST(binaryOutputIsSameAsPrintf)
 
 DEFINE_TEST(leftAlignIsCorrect)
 {
-	
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, const char*>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "    Hello World!\n", "%16s\n", "{:16}\n", "Hello World!" },
+			TupleType{ "Hello World!\n", "%8s\n", "{:8}\n", "Hello World!" },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "0XABCD  \n", "%#-8X\n", "{:<#8X}\n", 0xABCD },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
 	END_TEST;
 }
 
