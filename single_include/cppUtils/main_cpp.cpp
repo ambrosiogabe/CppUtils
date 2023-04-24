@@ -310,9 +310,30 @@ DEFINE_TEST(exponentialFloatOutputIsSameAsPrintf)
 	END_TEST;
 }
 
-DEFINE_TEST(binaryOutputIsSameAsPrintf)
+DEFINE_TEST(binaryOutputIsCorrect)
 {
-	ASSERT_TRUE(false);
+	using TupleType = std::tuple<std::string, std::string, uint32_t>;
+	const std::vector<TupleType> tests = {
+		TupleType{ "0000'0111\n", "{:b}\n", 7 },
+		TupleType{ "0000'1000'0000'0111\n", "{:<19b}\n", 2055 },
+		TupleType{ "0b0000'0111\n", "{:<#b}\n", 7 },
+		TupleType{ "0b0000'1000'0000'0111\n", "{:<#b}\n", 2055 },
+		TupleType{ "0B0000'0111\n", "{:<#B}\n", 7 },
+		TupleType{ "0B0000'1000'0000'0111\n", "{:<#B}\n", 2055 },
+	};
+
+	for (size_t i = 0; i < tests.size(); i++)
+	{
+		auto [expectedOutput, myFormatStr, number] = tests[i];
+		IO::printf(myFormatStr.c_str(), number);
+
+		const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+		if (res)
+		{
+			return res;
+		}
+	}
+
 	END_TEST;
 }
 
@@ -387,6 +408,29 @@ DEFINE_TEST(leftAlignIsCorrect)
 		}
 	}
 
+	// Test left-alignment for binary
+	{
+		using TupleType = std::tuple<std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "0000'0111          \n", "{:<19b}\n", 7 },
+			TupleType{ "0000'1000'0000'0111\n", "{:<19b}\n", 2055 },
+			TupleType{ "0b0000'0111          \n", "{:<#21b}\n", 7 },
+			TupleType{ "0b0000'1000'0000'0111\n", "{:<#21b}\n", 2055 },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, myFormatStr, number] = tests[i];
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
 	END_TEST;
 }
 
@@ -412,7 +456,7 @@ void setupPrintTestSuite()
 	ADD_TEST(testSuite, hexOutputIsSameAsPrintf);
 	ADD_TEST(testSuite, floatOutputIsSameAsPrintf);
 	ADD_TEST(testSuite, exponentialFloatOutputIsSameAsPrintf);
-	ADD_TEST(testSuite, binaryOutputIsSameAsPrintf);
+	ADD_TEST(testSuite, binaryOutputIsCorrect);
 	ADD_TEST(testSuite, leftAlignIsCorrect);
 	ADD_TEST(testSuite, rightAlignIsCorrect);
 	ADD_TEST(testSuite, centerAlignIsCorrect);

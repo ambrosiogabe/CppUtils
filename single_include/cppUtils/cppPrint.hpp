@@ -1225,6 +1225,11 @@ namespace IO
 // ------ Internal functions ------
 static const char* getIntPrefix(const Stream& io)
 {
+	if (!((uint32_t)io.mods & (uint32_t)StreamMods::AltFormat))
+	{
+		return "";
+	}
+
 	bool isCaps = (uint32_t)io.mods & (uint32_t)StreamMods::CapitalModifier;
 	switch (io.type)
 	{
@@ -1259,6 +1264,11 @@ static const char* getIntPrefix(const Stream& io)
 
 static size_t getIntPrefixSize(const Stream& io)
 {
+	if (!((uint32_t)io.mods & (uint32_t)StreamMods::AltFormat))
+	{
+		return sizeof("") - 1;
+	}
+
 	switch (io.type)
 	{
 	case StreamParamType::Binary:
@@ -1274,6 +1284,11 @@ static size_t getIntPrefixSize(const Stream& io)
 
 static const char* getFloatPrefix(const Stream& io)
 {
+	if (!((uint32_t)io.mods & (uint32_t)StreamMods::AltFormat))
+	{
+		return "";
+	}
+
 	bool isCaps = (uint32_t)io.mods & (uint32_t)StreamMods::CapitalModifier;
 	switch (io.type)
 	{
@@ -1292,6 +1307,11 @@ static const char* getFloatPrefix(const Stream& io)
 
 static size_t getFloatPrefixSize(const Stream& io)
 {
+	if (!((uint32_t)io.mods & (uint32_t)StreamMods::AltFormat))
+	{
+		return sizeof("") - 1;
+	}
+
 	switch (io.type)
 	{
 	case StreamParamType::FloatHexadecimal:
