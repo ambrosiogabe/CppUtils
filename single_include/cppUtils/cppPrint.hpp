@@ -852,14 +852,15 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 	// Handle special cases
 	if (isinf(number))
 	{
+		char baseA = ((uint8_t)io.mods & (uint8_t)StreamMods::CapitalModifier) ? 'A' : 'a';
 		char* bufferPtr = buffer;
 		if (number > 0)
 		{
 			if (bufferSize >= sizeof("inf"))
 			{
-				*bufferPtr++ = 'i';
-				*bufferPtr++ = 'n';
-				*bufferPtr++ = 'f';
+				*bufferPtr++ = ('i' - 'a') + baseA;
+				*bufferPtr++ = ('n' - 'a') + baseA;
+				*bufferPtr++ = ('f' - 'a') + baseA;
 				return sizeof("inf") - 1;
 			}
 
@@ -869,9 +870,9 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 		if (bufferSize >= sizeof("-inf"))
 		{
 			*bufferPtr++ = '-';
-			*bufferPtr++ = 'i';
-			*bufferPtr++ = 'n';
-			*bufferPtr++ = 'f';
+			*bufferPtr++ = ('i' - 'a') + baseA;
+			*bufferPtr++ = ('n' - 'a') + baseA;
+			*bufferPtr++ = ('f' - 'a') + baseA;
 			return sizeof("-inf") - 1;
 		}
 
@@ -879,12 +880,13 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 	}
 	else if (isnan(number))
 	{
+		char baseA = ((uint8_t)io.mods & (uint8_t)StreamMods::CapitalModifier) ? 'A' : 'a';
 		if (bufferSize >= sizeof("nan"))
 		{
 			char* bufferPtr = buffer;
-			*bufferPtr++ = 'n';
-			*bufferPtr++ = 'a';
-			*bufferPtr++ = 'n';
+			*bufferPtr++ = ('n' - 'a') + baseA;
+			*bufferPtr++ = ('a' - 'a') + baseA;
+			*bufferPtr++ = ('n' - 'a') + baseA;
 			return sizeof("nan") - 1;
 		}
 

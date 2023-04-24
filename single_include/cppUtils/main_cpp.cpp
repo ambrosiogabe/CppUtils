@@ -208,40 +208,47 @@ static const char* compareMemory(const uint8_t* expectedOutput, size_t expectedO
 	return nullptr;
 }
 
+static const char* compareMemoryPrintfOnly(const uint8_t* expectedOutput, size_t expectedOutputSize)
+{
+	DWORD numBytesRead;
+	BOOL res = ReadFile(
+		pipeRead,
+		(void*)&printBuffer[0],
+		sizeof(printBuffer),
+		&numBytesRead,
+		NULL
+	);
+
+	ASSERT_NOT_EQUAL(res, 0);
+	ASSERT_EQUAL(numBytesRead, expectedOutputSize);
+
+	bool memoryIsAsExpected = g_memory_compareMem(
+		(uint8_t*)printBuffer, expectedOutputSize,
+		(uint8_t*)expectedOutput, expectedOutputSize
+	);
+	ASSERT_TRUE(memoryIsAsExpected);
+
+	return nullptr;
+}
+
 DEFINE_TEST(hexOutputIsSameAsPrintf)
 {
-	const std::vector<std::string> expectedOutputs = {
-		"0XABCD\n",
-		"0xabcd\n",
-		"abcd\n",
-		"0x0000ffcc\n"
-	};
-	const std::vector<std::string> cPrintfStatements = {
-		"%#6X\n",
-		"%#6x\n",
-		"%4x\n",
-		"%#010x\n"
-	};
-	const std::vector<std::string> printfStatements = {
-		"{:#6X}\n",
-		"{:#6x}\n",
-		"{:4x}\n",
-		"{0:#10x}\n"
-	};
-	uint32_t hexNumbers[] = {
-		0xABCD,
-		0xABCD,
-		0xabcd,
-		0xffcc
+	using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
+	const std::vector<TupleType> tests = {
+		TupleType{     "0XABCD\n",   "%#6X\n",   "{:#6X}\n", 0xABCD },
+		TupleType{     "0xabcd\n",   "%#6x\n",   "{:#6x}\n", 0xABCD },
+		TupleType{       "abcd\n",    "%4x\n",    "{:4x}\n", 0xabcd },
+		TupleType{ "0x0000ffcc\n", "%#010x\n", "{0:#10x}\n", 0xffcc }
 	};
 
-	for (size_t i = 0; i < expectedOutputs.size(); i++)
+	for (size_t i = 0; i < tests.size(); i++)
 	{
-		printf(cPrintfStatements[i].c_str(), hexNumbers[i]);
-		IO::printf(printfStatements[i].c_str(), hexNumbers[i]);
+		auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+		printf(cFormatStr.c_str(), number);
+		IO::printf(myFormatStr.c_str(), number);
 
-		const char* res = compareMemory((const uint8_t*)expectedOutputs[i].c_str(), expectedOutputs[i].length());
-		if (res) 
+		const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+		if (res)
 		{
 			return res;
 		}
@@ -250,13 +257,78 @@ DEFINE_TEST(hexOutputIsSameAsPrintf)
 	END_TEST;
 }
 
-DEFINE_TEST(failedToOpenStdoutFile)
+DEFINE_TEST(floatOutputIsSameAsPrintf)
+{
+#pragma warning( push )
+#pragma warning( disable : 4616)
+	float one = 1.0f;
+	float zero = 0.0f;
+	using TupleType = std::tuple<std::string, std::string, std::string, float>;
+	const std::vector<TupleType> tests = {
+		TupleType{ "3.14\n", "%.2f\n", "{:.2f}\n", 3.145f },
+		TupleType{ "3.15\n", "%.2f\n", "{:.2f}\n", 3.146f },
+		TupleType{ "0.100000\n", "%f\n", "{}\n", 0.1f },
+		TupleType{ "1.000000\n", "%f\n", "{}\n", 1.000000f },
+		TupleType{ "inf\n", "%f\n", "{:f}\n", one / zero },
+		TupleType{ "INF\n", "%F\n", "{:F}\n", one / zero },
+		TupleType{ "-inf\n", "%f\n", "{:f}\n", -one / zero },
+		TupleType{ "-INF\n", "%F\n", "{:F}\n", -one / zero },
+		TupleType{ "2.1200\n", "%6.4f\n", "{0:6.4f}\n", 2.12f },
+		TupleType{ "  2.1200\n", "%8.4f\n", "{ :8.4f}\n", 2.12f }
+	};
+
+	for (size_t i = 0; i < tests.size(); i++)
+	{
+		auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+		printf(cFormatStr.c_str(), number);
+		IO::printf(myFormatStr.c_str(), number);
+
+		const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+		if (res)
+		{
+			return res;
+		}
+	}
+
+	// Test NAN separately since it does weird stuff
+	float a = 0.0f;
+	float b = 0.0f;
+	IO::printf("{:F}\n", a / b);
+	const char* res = compareMemoryPrintfOnly((const uint8_t*)"NAN\n", sizeof("NAN\n") - 1);
+	if (res)
+	{
+		return res;
+	}
+#pragma warning( pop )
+
+	END_TEST;
+}
+
+DEFINE_TEST(exponentialFloatOutputIsSameAsPrintf)
 {
 	ASSERT_TRUE(false);
 	END_TEST;
 }
 
-DEFINE_TEST(failedToCloseStdoutFile)
+DEFINE_TEST(binaryOutputIsSameAsPrintf)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+DEFINE_TEST(leftAlignIsCorrect)
+{
+	
+	END_TEST;
+}
+
+DEFINE_TEST(rightAlignIsCorrect)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+DEFINE_TEST(centerAlignIsCorrect)
 {
 	ASSERT_TRUE(false);
 	END_TEST;
@@ -270,6 +342,12 @@ void setupPrintTestSuite()
 	ADD_AFTER_EACH(testSuite, teardownTest);
 
 	ADD_TEST(testSuite, hexOutputIsSameAsPrintf);
+	ADD_TEST(testSuite, floatOutputIsSameAsPrintf);
+	ADD_TEST(testSuite, exponentialFloatOutputIsSameAsPrintf);
+	ADD_TEST(testSuite, binaryOutputIsSameAsPrintf);
+	ADD_TEST(testSuite, leftAlignIsCorrect);
+	ADD_TEST(testSuite, rightAlignIsCorrect);
+	ADD_TEST(testSuite, centerAlignIsCorrect);
 }
 
 }
