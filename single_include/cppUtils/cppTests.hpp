@@ -1,3 +1,171 @@
+/*
+ -------- QUICK_START --------
+ This is to be used in conjunction with the other source files, to use it do this:
+	 #define GABE_CPP_UTILS_IMPL
+ before you include this file (and the others) in *one* C++ file to create the implementation.
+
+ // i.e. it should look like this in *one* source file:
+ // The order of the includes is important, keep it in this order and you'll be fine
+ #define GABE_CPP_UTILS_IMPL
+#include <cppUtils/cppPrint.hpp>
+#include <cppUtils/cppUtils.hpp>
+#include <cppUtils/cppTests.hpp>
+#include <cppUtils/cppStrings.hpp>
+
+Then you can include it anywhere else you please.
+
+ -------- LICENSE --------
+
+ Open Source
+
+
+
+ -------- DOCUMENTATION --------
+
+ This is a quick and dirty lightweight C++ testing library. It has simple support for test suites and 
+ unit tests. The API is meant to be as ergonomic as possible, and to do this it uses macros.
+
+ ------ Reference ------
+
+
+ ---- Macros ----
+ ADD_TEST(testSuite, testName) 
+   
+   * Adds test with `testName` to the testSuite
+
+ ADD_BEFORE_EACH(testSuite, testName)
+
+   * Will run the function described by `testName` before each test in the test suite
+
+ ADD_AFTER_EACH(testSuite, testName)
+
+   * Will run the function described by `testName` after each test in the test suite
+
+ ASSERT_TRUE(val)
+ ASSERT_FALSE(val)
+
+ ASSERT_EQUAL(a, b)
+ ASSERT_NOT_EQUAL(a, b)
+
+ ASSERT_NULL(val)
+ ASSERT_NOT_NULL(val)
+
+ DEFINE_TEST(fnName)
+ END_TEST
+
+   * These two functions are used to define a test. Example usage is shown below in the Quickstart.
+
+ DEFINE_BEFORE_EACH(fnName) const char* fnName()
+ END_BEFORE_EACH return nullptr
+
+   * These two functions are used exactly the same way as defining a test like above.
+
+ DEFINE_AFTER_EACH(fnName) const char* fnName()
+ END_AFTER_EACH return nullptr
+
+   * Same as above, except used for defining the after each function.
+
+
+ ---- Functions ----
+
+ The namespace is CppUtils::Tests for all the following functions.
+
+ TestSuite& addTestSuite(const char* testSuiteName);
+
+   * Used to add a test suite to the global set of tests. Example usage below.
+
+ void addTest(TestSuite& testSuite, const char* testName, TestFn fn);
+ void setBeforeEach(TestSuite& testSuite, const char* testName, TestFn fn);
+ void setAfterEach(TestSuite& testSuite, const char* testName, TestFn fn);
+
+	* Used to add a test/beforeEach/afterEach to a test suite. The 
+	  ADD_TEST/ADD_BEFORE_EACH/ADD_AFTER_EACH helper macros are preferrable here.
+
+ void runTests();
+
+    * Will run all the tests and print the results to stdout.
+
+ void free();
+
+    * Frees any resources acquired during the test runs.
+
+ ------ Quickstart ------
+
+ Here's some code illustrating how to use this testing framework for two dummy test suites.
+
+// -------- Begin myTestCode.cpp --------
+#define GABE_CPP_UTILS_IMPL
+#include <cppUtils/cppPrint.hpp>
+#include <cppUtils/cppUtils.hpp>
+#include <cppUtils/cppTests.hpp>
+#include <cppUtils/cppStrings.hpp>
+
+namespace ThreadPoolTestSuite
+{
+
+DEFINE_TEST(dummy)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+void setupThreadPoolTestSuite()
+{
+    // This name can be anything.
+	Tests::TestSuite& testSuite = Tests::addTestSuite("My Thread Pool Test Suite");
+
+	// Add as many tests as you like here
+	ADD_TEST(testSuite, dummy);
+}
+
+}
+
+namespace CppUtilsTestSuite
+{
+
+DEFINE_TEST(dummy)
+{
+	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+void setupCppUtilsTestSuite()
+{
+	Tests::TestSuite& testSuite = Tests::addTestSuite("My Utilities Test Suite");
+
+	ADD_TEST(testSuite, dummy);
+}
+
+}
+
+void main() 
+{
+	g_logger_init();
+	g_logger_set_level(g_logger_level_All);
+	g_logger_set_log_directory("C:/dev/C++/CppUtils/logs");
+	g_memory_init_padding(true, 1024);
+
+	ThreadPoolTestSuite::setupThreadPoolTestSuite();
+	CppUtilsTestSuite::setupCppUtilsTestSuite();
+
+	Tests::runTests();
+	Tests::free();
+
+	g_memory_dumpMemoryLeaks();
+	g_memory_deinit();
+	g_logger_free();
+}
+
+// -------- End myTestCode.cpp --------
+
+
+ -------- DLL STUFF --------
+
+ This library is not intended to be used as a DLL. You should statically link.
+
+ If you have a use-case for dynamic linking, feel free to open an issue on the Github repository.
+*/
+
 #ifndef GABE_CPP_UTILS_TESTS_H
 #define GABE_CPP_UTILS_TESTS_H
 

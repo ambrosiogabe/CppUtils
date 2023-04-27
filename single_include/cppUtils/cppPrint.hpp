@@ -1,37 +1,27 @@
 /*
  -------- QUICK_START --------
- Do this:
-	 #define GABE_CPP_PRINT_IMPL
- before you include this file in *one* C++ file to create the implementation.
+ This is to be used in conjunction with the other source files, to use it do this:
+	 #define GABE_CPP_UTILS_IMPL
+ before you include this file (and the others) in *one* C++ file to create the implementation.
 
  // i.e. it should look like this in *one* source file:
+ // The order of the includes is important, keep it in this order and you'll be fine
  #define GABE_CPP_UTILS_IMPL
- #include "cppPrint.hpp"
+#include <cppUtils/cppPrint.hpp>
+#include <cppUtils/cppUtils.hpp>
+#include <cppUtils/cppTests.hpp>
+#include <cppUtils/cppStrings.hpp>
 
- -------- QUICK_START + cppUtils.hpp --------
- To use this library in conjunction with cppUtils.hpp, make sure any #include<cppUtils/cppUtils.hpp> are formatted like:
+Then you can include it anywhere else you please.
 
- #define USE_GABE_CPP_PRINT
- #include <cppUtils/cppUtils.hpp>
- #undef USE_GABE_CPP_PRINT
-
- And in your single implementation file, make sure it's formatted like:
-
- #define GABE_CPP_PRINT_IMPL
- #include <cppUtils/cppPrint.hpp>
- #undef GABE_CPP_PRINT_IMPL
-
- #define GABE_CPP_UTILS_IMPL
- #include <cppUtils/cppUtils.hpp>
-
- This will ensure that all calls to g_logger_* will use this print library, allowing you to make print statements
- like `g_logger_info("{:.2f}", 3.1416f)`.
+This works nicely with cppUtils.hpp. All calls to g_logger_* will use this print library,
+allowing you to make print statements like `g_logger_info("{:.2f}", 3.1416f)`.
 
 
 
  -------- LICENSE --------
 
- Open Source, see end of file
+ Open Source
 
 
  -------- DOCUMENTATION --------
@@ -413,7 +403,7 @@ static int32_t parseNextInteger(const char* str, size_t length, size_t* numChara
 void Stream::parseModifiers(const char* modifiersStr, size_t length)
 {
 	// format_spec ::= [fill](":")[align][sign]["#"][width]["." precision][type]
-	auto maybeParseInfo = Parser::makeParseInfo(modifiersStr, length);;
+	auto maybeParseInfo = Parser::makeParseInfo(modifiersStr, length);
 	if (!maybeParseInfo.hasValue())
 	{
 		throw std::runtime_error("Invalid UTF8 string passed to printf.");

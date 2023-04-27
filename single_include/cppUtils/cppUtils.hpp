@@ -1,7 +1,7 @@
 /*
  Do this:
 	 #define GABE_CPP_UTILS_IMPL
- before you include this file in *one* C++ file to create the implementation.
+ before you include this file in *one* C/C++ file to create the implementation.
 
  // i.e. it should look like this in *one* source file:
  #define GABE_CPP_UTILS_IMPL

@@ -35,7 +35,7 @@ struct Maybe
 	constexpr inline T& operator*() { return std::get<T>(data); }
 
 	[[nodiscard]]
-	constexpr inline const T& operator*() const { return std::move(std::get<T>(data)); }
+	constexpr inline const T& operator*() const { return std::get<T>(data); }
 };
 
 } // End CppUtils

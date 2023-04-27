@@ -1,16 +1,23 @@
 /*
- Do this:
+ -------- QUICK_START --------
+ This is to be used in conjunction with the other source files, to use it do this:
 	 #define GABE_CPP_UTILS_IMPL
- before you include this file in *one* C++ file to create the implementation.
+ before you include this file (and the others) in *one* C++ file to create the implementation.
 
  // i.e. it should look like this in *one* source file:
- #define GABE_CPP_STRINGS_IMPL
- #include "cppStrings.hpp"
+ // The order of the includes is important, keep it in this order and you'll be fine
+ #define GABE_CPP_UTILS_IMPL
+#include <cppUtils/cppPrint.hpp>
+#include <cppUtils/cppUtils.hpp>
+#include <cppUtils/cppTests.hpp>
+#include <cppUtils/cppStrings.hpp>
+
+Then you can include it anywhere else you please.
 
 
  -------- LICENSE --------
 
- Open Source, see end of file
+ Open Source
 
 
 
