@@ -230,7 +230,7 @@ namespace IO
 extern Stream stdoutStream;
 
 GABE_CPP_PRINT_API void _printfInternal(const char* s, size_t length);
-GABE_CPP_PRINT_API void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io);
+GABE_CPP_PRINT_API void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io, bool isPositive = false);
 
 GABE_CPP_PRINT_API void printf(const char* s);
 
@@ -677,7 +677,7 @@ void Stream::resetModifiers()
 	this->fillCharacter = ' ';
 	this->mods = StreamMods::None;
 	this->precision = 0;
-	this->sign = StreamSign::Positive;
+	this->sign = StreamSign::Negative;
 	this->type = StreamParamType::None;
 	this->width = 0;
 }
@@ -1035,7 +1035,7 @@ Stream& operator<<(Stream& io, float const& number)
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
 	size_t length = realNumberToString((double)number, buffer, bufferSize, io, 5);
-	IO::printFormattedString(buffer, length, IO::getFloatPrefix(io), IO::getFloatPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getFloatPrefix(io), IO::getFloatPrefixSize(io), io, number > 0);
 	return io;
 }
 
@@ -1045,7 +1045,7 @@ Stream& operator<<(Stream& io, double const& number)
 	constexpr size_t bufferSize = 128;
 	char buffer[bufferSize];
 	size_t length = realNumberToString(number, buffer, bufferSize, io, 5);
-	IO::printFormattedString(buffer, length, IO::getFloatPrefix(io), IO::getFloatPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getFloatPrefix(io), IO::getFloatPrefixSize(io), io, number > 0);
 	return io;
 }
 
@@ -1054,7 +1054,7 @@ Stream& operator<<(Stream& io, int8_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
-	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
 	return io;
 }
 
@@ -1063,7 +1063,7 @@ Stream& operator<<(Stream& io, int16_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
-	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
 	return io;
 }
 
@@ -1072,7 +1072,7 @@ Stream& operator<<(Stream& io, int32_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
-	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
 	return io;
 }
 
@@ -1081,7 +1081,7 @@ Stream& operator<<(Stream& io, int64_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
-	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
 	return io;
 }
 
@@ -1090,7 +1090,7 @@ Stream& operator<<(Stream& io, uint8_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
-	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
 	return io;
 }
 
@@ -1099,7 +1099,7 @@ Stream& operator<<(Stream& io, uint16_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
-	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
 	return io;
 }
 
@@ -1108,7 +1108,7 @@ Stream& operator<<(Stream& io, uint32_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
-	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
 	return io;
 }
 
@@ -1117,7 +1117,7 @@ Stream& operator<<(Stream& io, uint64_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
-	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
 	return io;
 }
 
@@ -1667,12 +1667,13 @@ void _printfInternal(const char* s, size_t length)
 	}
 }
 
-void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io)
+void printFormattedString(const char* content, size_t contentLength, const char* prefix, size_t prefixLength, const Stream& io, bool isPositive)
 {
 	bool shouldUseZeroPadding = ((uint8_t)io.mods & (uint8_t)StreamMods::UseZeroPadding);
 	bool shouldUseAltFormat = ((uint8_t)io.mods & (uint8_t)StreamMods::AltFormat);
 	StreamAlign alignment = io.alignment;
 	uint32_t fillChar = io.fillCharacter;
+	StreamSign sign = io.sign;
 
 	if (prefixLength > 0 && shouldUseAltFormat && shouldUseZeroPadding)
 	{
@@ -1769,6 +1770,27 @@ void printFormattedString(const char* content, size_t contentLength, const char*
 		//       prefix immediately before the content
 		_printfInternal(prefix, prefixLength);
 	}
+
+	if (sign != StreamSign::Negative && isPositive && (
+		io.type == StreamParamType::Decimal ||
+		io.type == StreamParamType::ExponentNotation ||
+		io.type == StreamParamType::FixedPoint ||
+		io.type == StreamParamType::GeneralFormat
+		))
+	{
+		switch (sign)
+		{
+		case StreamSign::Positive:
+			_printfInternal("+", sizeof("+") - 1);
+			break;
+		case StreamSign::Space:
+			_printfInternal(" ", sizeof(" ") - 1);
+			break;
+		default:
+			break;
+		}
+	}
+
 	_printfInternal(content, contentLength);
 
 	if (rightPadding > 0)

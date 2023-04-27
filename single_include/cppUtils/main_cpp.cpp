@@ -326,7 +326,7 @@ DEFINE_TEST(binaryOutputIsCorrect)
 	{
 		auto [expectedOutput, myFormatStr, number] = tests[i];
 		IO::printf(myFormatStr.c_str(), number);
-		 
+
 		const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
 		if (res)
 		{
@@ -634,6 +634,140 @@ DEFINE_TEST(centerAlignIsCorrect)
 	END_TEST;
 }
 
+DEFINE_TEST(signedOutputIsSameAsPrintf)
+{
+	// Signed output shouldn't effect hex ints
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "  0XABCD\n", "%+#8X\n", "{:>+#8X}\n", 0xABCD },
+			TupleType{ "ABCD\n", "%+3X\n", "{:>+3X}\n", 0xABCD },
+			TupleType{ "0X00ABCD\n", "%+#08X\n", "{:>+#08X}\n", 0xABCD },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Signed/spaced output test for floats
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, float>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "+1.123\n", "%+.3f\n", "{:+.3f}\n", 1.123f },
+			TupleType{ "-1.123\n", "%+.3f\n", "{:+.3f}\n", -1.123f },
+			TupleType{ " 1.123\n", "% .3f\n", "{: .3f}\n", 1.123f },
+			TupleType{ "-1.123\n", "% .3f\n", "{: .3f}\n", -1.123f },
+			TupleType{ "1.123\n", "%.3f\n", "{:-.3f}\n", 1.123f },
+			TupleType{ "-1.123\n", "%.3f\n", "{:-.3f}\n", -1.123f },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Signed/spaced output should do nothing for binary
+	{
+		using TupleType = std::tuple<std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "          0000'0111\n", "{:>+19b}\n", 7 },
+			TupleType{ "0000'1000'0000'0111\n", "{:>+19b}\n", 2055 },
+			TupleType{ "          0b0000'0111\n", "{:>-#21b}\n", 7 },
+			TupleType{ "0b0000'1000'0000'0111\n", "{:>-#21b}\n", 2055 },
+			TupleType{ "          0b0000'0111\n", "{:> #21b}\n", 7 },
+			TupleType{ "0b0000'1000'0000'0111\n", "{:> #21b}\n", 2055 }
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, myFormatStr, number] = tests[i];
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Signed/spaced output test for decimal integers
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, int32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "+7\n", "%+d\n", "{:+d}\n", 7 },
+			TupleType{ "-7\n", "%+d\n", "{:+d}\n", -7 },
+			TupleType{ " 232\n", "% d\n", "{: d}\n", 232 },
+			TupleType{ "-232\n", "% d\n", "{: d}\n", -232 },
+			TupleType{ "1299\n", "%d\n", "{:-d}\n", 1299 },
+			TupleType{ "-1299\n", "%d\n", "{:-d}\n", -1299 },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+	END_TEST;
+}
+
+DEFINE_TEST(utf8FillCharacterFillsProperly)
+{
+	// Different sized UTF8 characters shouldn't effect the fill count
+	using TupleType = std::tuple<std::string, std::string, std::string>;
+	const std::vector<TupleType> tests = {
+		// 1-byte UTF8 codepoint
+		TupleType{ "$$Hi!$$\n", "{$:^7}\n", "Hi!"},
+		// 2-byte UTF8 codepoint
+		TupleType{ u8"\u00A7\u00A7Hi!\u00A7\u00A7\n", u8"{\u00A7:^7}\n", "Hi!"},
+		// 3-byte UTF8 codepoint
+		TupleType{ u8"\u09A8\u09A8Hi!\u09A8\u09A8\n", u8"{\u09A8:^7}\n", "Hi!"},
+		// 4-byte UTF8 codepoint
+		TupleType{ u8"\U0001D122\U0001D122Hi!\U0001D122\U0001D122\n", u8"{\U0001D122:^7}\n", "Hi!"},
+	};
+
+	for (size_t i = 0; i < tests.size(); i++)
+	{
+		auto [expectedOutput, myFormatStr, str] = tests[i];
+		IO::printf(myFormatStr.c_str(), str);
+
+		const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+		if (res)
+		{
+			return res;
+		}
+	}
+
+	END_TEST;
+}
+
 void setupPrintTestSuite()
 {
 	Tests::TestSuite& testSuite = Tests::addTestSuite("cppPrint.hpp");
@@ -648,6 +782,8 @@ void setupPrintTestSuite()
 	ADD_TEST(testSuite, leftAlignIsCorrect);
 	ADD_TEST(testSuite, rightAlignIsCorrect);
 	ADD_TEST(testSuite, centerAlignIsCorrect);
+	ADD_TEST(testSuite, signedOutputIsSameAsPrintf);
+	ADD_TEST(testSuite, utf8FillCharacterFillsProperly);
 }
 
 }
