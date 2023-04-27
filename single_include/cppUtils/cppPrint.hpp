@@ -1673,14 +1673,19 @@ void printFormattedString(const char* content, size_t contentLength, const char*
 	bool shouldUseAltFormat = ((uint8_t)io.mods & (uint8_t)StreamMods::AltFormat);
 	StreamAlign alignment = io.alignment;
 	uint32_t fillChar = io.fillCharacter;
+
 	if (prefixLength > 0 && shouldUseAltFormat && shouldUseZeroPadding)
 	{
 		// NOTE: If we're printing alt format and want to use 0's as padding,
 		//       print the prefix before anything else
 		//       We also force alignment to the right
 		_printfInternal(prefix, prefixLength);
-		alignment = StreamAlign::Right;
+	}
+
+	if (shouldUseZeroPadding)
+	{
 		fillChar = '0';
+		alignment = StreamAlign::Right;
 	}
 
 	auto numCharsInContent = String::utf8Length(content, contentLength);
@@ -1715,10 +1720,10 @@ void printFormattedString(const char* content, size_t contentLength, const char*
 		{
 			if (io.width > totalContentLength)
 			{
-				leftPadding = (uint32_t)((io.width - totalContentLength) / 2);
-				// Since integer division can truncate, rightPadding will just
+				rightPadding = (uint32_t)((io.width - totalContentLength) / 2);
+				// Since integer division can truncate, leftPadding will just
 				// take whatever's left
-				rightPadding = (uint32_t)(io.width - totalContentLength - leftPadding);
+				leftPadding = (uint32_t)(io.width - totalContentLength - rightPadding);
 			}
 		}
 		break;

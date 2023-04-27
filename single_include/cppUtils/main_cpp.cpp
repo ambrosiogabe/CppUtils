@@ -326,7 +326,7 @@ DEFINE_TEST(binaryOutputIsCorrect)
 	{
 		auto [expectedOutput, myFormatStr, number] = tests[i];
 		IO::printf(myFormatStr.c_str(), number);
-
+		 
 		const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
 		if (res)
 		{
@@ -367,9 +367,10 @@ DEFINE_TEST(leftAlignIsCorrect)
 		const std::vector<TupleType> tests = {
 			TupleType{ "0XABCD  \n", "%#-8X\n", "{:<#8X}\n", 0xABCD },
 			TupleType{ "0XABCD\n", "%#-3X\n", "{:<#3X}\n", 0xABCD },
-			TupleType{ "0XABCD  \n", "%#-8X\n", "{:<#8X}\n", 0xABCD },
-			TupleType{ "0XABCD\n", "%#-3X\n", "{:<#3X}\n", 0xABCD },
 			TupleType{ "0X00ABCD\n", "%#08X\n", "{:<#08X}\n", 0xABCD },
+			TupleType{ "ABCD    \n", "%-8X\n", "{:<8X}\n", 0xABCD },
+			TupleType{ "ABCD\n", "%-3X\n", "{:<3X}\n", 0xABCD },
+			TupleType{ "0000ABCD\n", "%08X\n", "{:<08X}\n", 0xABCD },
 		};
 
 		for (size_t i = 0; i < tests.size(); i++)
@@ -436,13 +437,200 @@ DEFINE_TEST(leftAlignIsCorrect)
 
 DEFINE_TEST(rightAlignIsCorrect)
 {
-	ASSERT_TRUE(false);
+	// Test right-alignment for strings
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, const char*>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "    Hello World!\n", "%16s\n", "{:>16}\n", "Hello World!" },
+			TupleType{ "Hello World!\n", "%8s\n", "{:>8}\n", "Hello World!" },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Test right-alignment for hex ints (and 0-padded hex ints)
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "  0XABCD\n", "%#8X\n", "{:>#8X}\n", 0xABCD },
+			TupleType{ "0XABCD\n", "%#3X\n", "{:>#3X}\n", 0xABCD },
+			TupleType{ "0X00ABCD\n", "%#08X\n", "{:>#08X}\n", 0xABCD },
+			TupleType{ "    ABCD\n", "%8X\n", "{:>8X}\n", 0xABCD },
+			TupleType{ "ABCD\n", "%3X\n", "{:>3X}\n", 0xABCD },
+			TupleType{ "0000ABCD\n", "%08X\n", "{:>08X}\n", 0xABCD },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Test right-alignment for floats
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, float>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "  1.123\n", "%7.3f\n", "{:>7.3f}\n", 1.123f },
+			TupleType{ "1.123\n", "%2.3f\n", "{:>2.3f}\n", 1.123f },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Test right-alignment for binary
+	{
+		using TupleType = std::tuple<std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "          0000'0111\n", "{:>19b}\n", 7 },
+			TupleType{ "0000'1000'0000'0111\n", "{:>19b}\n", 2055 },
+			TupleType{ "          0b0000'0111\n", "{:>#21b}\n", 7 },
+			TupleType{ "0b0000'1000'0000'0111\n", "{:>#21b}\n", 2055 },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, myFormatStr, number] = tests[i];
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
 	END_TEST;
 }
 
 DEFINE_TEST(centerAlignIsCorrect)
 {
-	ASSERT_TRUE(false);
+	// Test center-alignment for strings
+	{
+		using TupleType = std::tuple<std::string, std::string, const char*>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "  Hello World!  \n", "{:^16}\n", "Hello World!" },
+			TupleType{ "Hello World!\n", "{:^8}\n", "Hello World!" },
+			TupleType{ "   Hello World!  \n", "{:^17}\n", "Hello World!" },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, myFormatStr, number] = tests[i];
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Test center-alignment for hex ints (and 0-padded hex ints)
+	{
+		using TupleType = std::tuple<std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ " 0XABCD \n", "{:^#8X}\n", 0xABCD },
+			TupleType{ "  0XABCD \n", "{:^#9X}\n", 0xABCD },
+			TupleType{ "0XABCD\n", "{:^#3X}\n", 0xABCD },
+			TupleType{ "0X00ABCD\n", "{:^#08X}\n", 0xABCD },
+			TupleType{ "  ABCD  \n", "{:^8X}\n", 0xABCD },
+			TupleType{ "   ABCD  \n", "{:^9X}\n", 0xABCD },
+			TupleType{ "ABCD\n", "{:^3X}\n", 0xABCD },
+			TupleType{ "0000ABCD\n", "{:^08X}\n", 0xABCD },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, myFormatStr, number] = tests[i];
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Test center-alignment for floats
+	{
+		using TupleType = std::tuple<std::string, std::string, float>;
+		const std::vector<TupleType> tests = {
+			TupleType{ " 1.123 \n", "{:^7.3f}\n", 1.123f },
+			TupleType{ "  1.123 \n", "{:^8.3f}\n", 1.123f },
+			TupleType{ "1.123\n", "{:^2.3f}\n", 1.123f },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, myFormatStr, number] = tests[i];
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
+	// Test center-alignment for binary
+	{
+		using TupleType = std::tuple<std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "     0000'0111     \n", "{:^19b}\n", 7 },
+			TupleType{ "      0000'0111     \n", "{:^20b}\n", 7 },
+			TupleType{ "0000'1000'0000'0111\n", "{:^19b}\n", 2055 },
+			TupleType{ "     0b0000'0111     \n", "{:^#21b}\n", 7 },
+			TupleType{ "      0b0000'0111     \n", "{:^#22b}\n", 7 },
+			TupleType{ "0b0000'1000'0000'0111\n", "{:^#21b}\n", 2055 },
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, myFormatStr, number] = tests[i];
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+	}
+
 	END_TEST;
 }
 
