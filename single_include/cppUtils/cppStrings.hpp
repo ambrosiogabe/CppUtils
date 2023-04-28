@@ -542,4 +542,4 @@ Maybe<uint32_t, Utf8ErrorCode> peek(ParseInfo& parseInfo, uint8_t* numBytesParse
 
 } } // End CppUtils::Parser
 
-#endif // GABE_CPP_STRINGS_IMPL
+#endif // GABE_CPP_UTILS_IMPL

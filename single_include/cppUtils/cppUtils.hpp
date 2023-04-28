@@ -228,9 +228,10 @@ const WORD g_logger_BACKGROUND_GREEN = 0x0020; // background color contains gree
 const WORD g_logger_BACKGROUND_RED = 0x0040; // background color contains red.
 #endif
 
+#define VA_ARGS(...) , ##__VA_ARGS__
+
 #ifndef USE_GABE_CPP_PRINT
 #ifdef _WIN32
-#define VA_ARGS(...) , ##__VA_ARGS__
 #define g_logger_log(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Log, g_logger_FOREGROUND_BLUE | g_logger_FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
 #define g_logger_info(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Info, g_logger_FOREGROUND_GREEN, format VA_ARGS(__VA_ARGS__))
 #define g_logger_warning(format, ...) _g_logger_cStdCommonPrint(__FILE__, __LINE__, g_logger_level_Warning, g_logger_FOREGROUND_GREEN | g_logger_FOREGROUND_RED, format VA_ARGS(__VA_ARGS__))
@@ -320,7 +321,6 @@ GABE_CPP_UTILS_API void _g_logger_gabeAssert(const char* filename, int line, boo
 	}
 }
 
-#define VA_ARGS(...) , ##__VA_ARGS__
 #define g_logger_log(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Log, CppUtils::ConsoleColor::CYAN, format VA_ARGS(__VA_ARGS__))
 #define g_logger_info(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Info, CppUtils::ConsoleColor::GREEN, format VA_ARGS(__VA_ARGS__))
 #define g_logger_warning(format, ...) _g_logger_gabeCommonPrint(__FILE__, __LINE__, g_logger_level_Warning, CppUtils::ConsoleColor::YELLOW, format VA_ARGS(__VA_ARGS__))
@@ -977,7 +977,6 @@ void _g_logger_cStdCommonPrint(const char* filename, int line, g_logger_level le
 		g_thread_releaseMutex(logMutex);
 	}
 }
-#endif // not defined USE_GABE_CPP
 
 void _g_logger_assert(const char* filename, int line, int condition, const char* format, ...)
 {
@@ -1080,6 +1079,8 @@ void _g_logger_assert(const char* filename, int line, int condition, const char*
 #undef bufferCount
 #undef fullErrorMessageBufferSize
 }
+
+#endif // not defined USE_GABE_CPP
 
 #elif defined(unix) || defined(__unix) || defined(__unix__) // end LOGGING_IMPL_WIN32
 // begin LOGGING_IMPL_LINUX

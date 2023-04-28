@@ -907,6 +907,11 @@ void mainFunc()
 
 	if (testingCppPrint)
 	{
+		g_logger_info("Info");
+		g_logger_warning("Info");
+		g_logger_error("Info");
+		g_logger_assert(true, "Info");
+
 		g_logger_info("{}", "Hello World!");
 
 		g_logger_info("Pi: {}", 3.14f);

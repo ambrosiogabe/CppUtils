@@ -221,8 +221,9 @@ void free();
 #include <vector>
 
 #undef GABE_CPP_UTILS_IMPL
-#include "cppUtils/cppUtils.hpp"
-#include "cppUtils/cppPrint.hpp"
+#include <cppUtils/cppUtils.hpp>
+#undef GABE_CPP_UTILS_IMPL
+#include <cppUtils/cppPrint.hpp>
 #define GABE_CPP_UTILS_IMPL
 
 namespace CppUtils
@@ -494,4 +495,4 @@ static void freeTestPrototype(TestPrototype& test)
 }
 } // End namespace CppUtils::Tests
 
-#endif 
+#endif // end GABE_CPP_UTILS_IMPL

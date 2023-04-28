@@ -1835,4 +1835,4 @@ void _printfInternal(const char* s, size_t length)
 
 #endif // end PLATFORM_IMPLS
 
-#endif // end GABE_CPP_PRINT_IMPL
+#endif // end GABE_CPP_UTILS_IMPL
