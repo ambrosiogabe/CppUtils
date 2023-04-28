@@ -8,6 +8,12 @@
  #include "cppUtils.hpp"
  #undef GABE_CPP_UTILS_IMPL
 
+ NOTE: When using this with the cppPrint.hpp file, make sure to define USE_GABE_CPP_PRINT before including this file
+       anywhere like this:
+
+ #define USE_GABE_CPP_PRINT
+ #include "cppUtils.hpp"
+
 
 
  -------- LICENSE --------
@@ -296,7 +302,7 @@ GABE_CPP_UTILS_API void _g_logger_gabeCommonPrint(const char* filename, int line
 	{
 		char buf[20] = { 0 };
 		_g_logger_printPreamble(filename, line, buf, sizeof(buf), color);
-		IO::printf(format, args...);
+		CppUtils::IO::printf(format, args...);
 		_g_logger_printPostamble(filename, line, buf, sizeof(buf));
 	}
 }
@@ -313,7 +319,7 @@ GABE_CPP_UTILS_API void _g_logger_gabeAssert(const char* filename, int line, boo
 		{
 			char buf[20] = { 0 };
 			_g_logger_assertGabePreamble(filename, line, buf, sizeof(buf));
-			IO::printf(format, args...);
+			CppUtils::IO::printf(format, args...);
 			_g_logger_assertGabePostamble(filename, line, buf, sizeof(buf));
 		}
 	}
