@@ -6,6 +6,7 @@
  // i.e. it should look like this in *one* source file:
  #define GABE_CPP_UTILS_IMPL
  #include "cppUtils.hpp"
+ #undef GABE_CPP_UTILS_IMPL
 
 
 
@@ -281,10 +282,7 @@ const WORD g_logger_BACKGROUND_RED = 0x0040; // background color contains red.
 
 // Template version of logging for using this library with GABE_CPP_PRINT library
 #ifdef USE_GABE_CPP_PRINT
-
-#undef GABE_CPP_UTILS_IMPL
 #include <cppUtils/cppPrint.hpp>
-#define GABE_CPP_UTILS_IMPL
 
 #ifdef _WIN32
 

@@ -1,18 +1,27 @@
 /*
  -------- QUICK_START --------
- This is to be used in conjunction with the other source files, to use it do this:
-	 #define GABE_CPP_UTILS_IMPL
- before you include this file (and the others) in *one* C++ file to create the implementation.
+ This is to be used in conjunction with the other source files, to use it do the following code snippet
+ in *one* C++ file to create the implementation.
 
  // i.e. it should look like this in *one* source file:
  // The order of the includes is important, keep it in this order and you'll be fine
- #define GABE_CPP_UTILS_IMPL
-#include <cppUtils/cppPrint.hpp>
-#include <cppUtils/cppUtils.hpp>
-#include <cppUtils/cppTests.hpp>
-#include <cppUtils/cppStrings.hpp>
+ #define GABE_CPP_PRINT_IMPL
+ #include <cppUtils/cppPrint.hpp>
+ #undef GABE_CPP_PRINT_IMPL
 
-Then you can include it anywhere else you please.
+ #define GABE_CPP_UTILS_IMPL
+ #include <cppUtils/cppUtils.hpp>
+ #undef GABE_CPP_UTILS_IMPL
+
+ #define GABE_CPP_TESTS_IMPL
+ #include <cppUtils/cppTests.hpp>
+ #undef GABE_CPP_TESTS_IMPL
+
+ #define GABE_CPP_STRING_IMPL
+ #include <cppUtils/cppStrings.hpp>
+ #undef GABE_CPP_STRING_IMPL
+
+ Then you can include it anywhere else you please.
 
 
  -------- LICENSE --------
@@ -159,11 +168,9 @@ CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Utf8ErrorCode error
 
 #endif // GABE_CPP_STRINGS_H
 
-#ifdef GABE_CPP_UTILS_IMPL
-
-#undef GABE_CPP_UTILS_IMPL
+#ifdef GABE_CPP_STRING_IMPL
+#define USE_GABE_CPP_PRINT
 #include <cppUtils/cppUtils.hpp>
-#define GABE_CPP_UTILS_IMPL
 
 CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Utf8ErrorCode error)
 {
@@ -542,4 +549,4 @@ Maybe<uint32_t, Utf8ErrorCode> peek(ParseInfo& parseInfo, uint8_t* numBytesParse
 
 } } // End CppUtils::Parser
 
-#endif // GABE_CPP_UTILS_IMPL
+#endif // GABE_CPP_STRING_IMPL
