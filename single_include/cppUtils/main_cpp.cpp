@@ -1036,6 +1036,13 @@ void mainFunc()
 	}
 
 	g_logger_info("A char: {}", (char)'a');
+	g_logger_info("An unsigned and signed long: {} {}", (unsigned long)20, (signed long)-20);
+	int aVar = 5;
+	g_logger_info(
+		"\n A pointer: {}"
+		"\nReal value: {:#018X}", 
+		&aVar,
+		(uint64_t)(void*)(&aVar));
 
 	g_memory_dumpMemoryLeaks();
 

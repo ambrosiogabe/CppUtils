@@ -128,6 +128,7 @@
 #define GABE_CPP_PRINT_H
 
 #include <string>
+#include <filesystem>
 #include <stdexcept>
 #include <cppUtils/cppMaybe.hpp>
 
@@ -326,6 +327,8 @@ CppUtils::Stream& operator<<(CppUtils::Stream& io, int16_t const& integer);
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, int32_t const& integer);
 template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, long const& integer);
+template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, int64_t const& integer);
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, uint8_t const& integer);
@@ -333,6 +336,8 @@ template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, uint16_t const& integer);
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, uint32_t const& integer);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, unsigned long const& integer);
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, uint64_t const& integer);
 template<>
@@ -352,6 +357,8 @@ CppUtils::Stream& operator<<(CppUtils::Stream& io, SizedCharArray<N> const& s)
 }
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, std::string const& str);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, std::filesystem::path const& str);
 template<typename T, typename E>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Maybe<T, E> const& maybeVal)
 {
@@ -369,6 +376,12 @@ template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::ConsoleColor const& color);
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, char const& c);
+template<typename T>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, T* const& c)
+{
+	CppUtils::IO::printf("{:#018p}", (uint64_t)(void*)(c));
+	return io;
+}
 
 #endif // GABE_CPP_PRINT_H
 
@@ -837,6 +850,7 @@ static size_t integerToString(char* const buffer, size_t bufferSize, T integer, 
 	case StreamParamType::Decimal:
 		return integerToString(buffer, bufferSize, integer);
 	case StreamParamType::Hexadecimal:
+	case StreamParamType::Pointer:
 		return integerToHexString(buffer, bufferSize, &integer, sizeof(T),
 			(uint32_t)io.mods & (uint32_t)StreamMods::CapitalModifier);
 	case StreamParamType::Binary:
@@ -1075,6 +1089,15 @@ Stream& operator<<(Stream& io, int32_t const& integer)
 }
 
 template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, long const& integer)
+{
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
+	return io;
+}
+
+template<>
 Stream& operator<<(Stream& io, int64_t const& integer)
 {
 	char buffer[IO::maxIntegerBufferSize];
@@ -1103,6 +1126,15 @@ Stream& operator<<(Stream& io, uint16_t const& integer)
 
 template<>
 Stream& operator<<(Stream& io, uint32_t const& integer)
+{
+	char buffer[IO::maxIntegerBufferSize];
+	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
+	IO::printFormattedString(buffer, length, IO::getIntPrefix(io), IO::getIntPrefixSize(io), io, integer > 0);
+	return io;
+}
+
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, unsigned long const& integer) 
 {
 	char buffer[IO::maxIntegerBufferSize];
 	size_t length = integerToString(buffer, IO::maxIntegerBufferSize, integer, io);
@@ -1222,6 +1254,13 @@ Stream& operator<<(Stream& io, std::string const& str)
 	return io;
 }
 
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, std::filesystem::path const& str)
+{
+	IO::printFormattedString((const char*)str.string().c_str(), str.string().size(), "", 0, io);
+	return io;
+}
+
 namespace CppUtils
 {
 namespace IO
@@ -1262,6 +1301,8 @@ static const char* getIntPrefix(const Stream& io)
 		}
 		return "0x";
 	}
+	case StreamParamType::Pointer:
+		return "0x";
 	default:
 		return "";
 	}
@@ -1281,6 +1322,8 @@ static size_t getIntPrefixSize(const Stream& io)
 	case StreamParamType::Octal:
 		return sizeof("0c") - 1;
 	case StreamParamType::Hexadecimal:
+		return sizeof("0x") - 1;
+	case StreamParamType::Pointer:
 		return sizeof("0x") - 1;
 	default:
 		return sizeof("") - 1;
