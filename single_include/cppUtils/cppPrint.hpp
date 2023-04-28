@@ -316,6 +316,12 @@ template<std::size_t N>
 using SizedCharArray = char[N];
 
 // Specializations for common types
+template<typename T>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, T* const& c)
+{
+	CppUtils::IO::printf("{:#018p}", (uint64_t)(void*)(c));
+	return io;
+}
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, float const& number);
 template<>
@@ -376,12 +382,6 @@ template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::ConsoleColor const& color);
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, char const& c);
-template<typename T>
-CppUtils::Stream& operator<<(CppUtils::Stream& io, T* const& c)
-{
-	CppUtils::IO::printf("{:#018p}", (uint64_t)(void*)(c));
-	return io;
-}
 
 #endif // GABE_CPP_PRINT_H
 
