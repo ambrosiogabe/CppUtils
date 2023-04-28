@@ -1035,7 +1035,7 @@ void mainFunc()
 		IO::printf("\n");
 	}
 
-	g_logger_info("PI: {*:^10.2f}", 3.14f);
+	g_logger_info("A char: {}", (char)'a');
 
 	g_memory_dumpMemoryLeaks();
 

@@ -367,6 +367,8 @@ CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::Maybe<T, E> const& 
 }
 template<>
 CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::ConsoleColor const& color);
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, char const& c);
 
 #endif // GABE_CPP_PRINT_H
 
@@ -1182,6 +1184,13 @@ CppUtils::Stream& operator<<(CppUtils::Stream& io, CppUtils::ConsoleColor const&
 		break;
 	}
 
+	return io;
+}
+
+template<>
+CppUtils::Stream& operator<<(CppUtils::Stream& io, char const& c)
+{
+	IO::printFormattedString((const char*)(&c), 1, "", 0, io);
 	return io;
 }
 
