@@ -946,7 +946,7 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 
 	// Calculate magnitude
 	int magnitude = (int)log10(n);
-
+	
 	bool useExp = magnitude > expCutoff || magnitude < -expCutoff;
 	bool expSignIsPositive = magnitude > 0;
 	int expNumber = 0;
@@ -960,6 +960,11 @@ static size_t realNumberToString(double const& number, char* const buffer, size_
 			magnitude--;
 		}
 		expNumber = magnitude;
+		magnitude = 0;
+	}
+
+	if (magnitude < 0)
+	{
 		magnitude = 0;
 	}
 

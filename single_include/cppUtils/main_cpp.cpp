@@ -284,7 +284,8 @@ DEFINE_TEST(floatOutputIsSameAsPrintf)
 		TupleType{ "-inf\n", "%f\n", "{:f}\n", -one / zero },
 		TupleType{ "-INF\n", "%F\n", "{:F}\n", -one / zero },
 		TupleType{ "2.1200\n", "%6.4f\n", "{0:6.4f}\n", 2.12f },
-		TupleType{ "  2.1200\n", "%8.4f\n", "{ :8.4f}\n", 2.12f }
+		TupleType{ "  2.1200\n", "%8.4f\n", "{ :8.4f}\n", 2.12f },
+		TupleType{ "-0.066017\n", "%f\n", "{}\n", -0.066017486155033112f}
 	};
 
 	for (size_t i = 0; i < tests.size(); i++)
@@ -309,6 +310,16 @@ DEFINE_TEST(floatOutputIsSameAsPrintf)
 	{
 		return res;
 	}
+
+	// Test exponential degradation (printf doesn't support this, but we do)
+	// The number should degrade to exponential format if it doesn't fit in the precision
+	IO::printf("{}\n", 1.17E-41f);
+	res = compareMemoryPrintfOnly((const uint8_t*)"1.169944e-41\n", sizeof("1.169944e-41\n") - 1);
+	if (res)
+	{
+		return res;
+	}
+
 #pragma warning( pop )
 
 	END_TEST;
