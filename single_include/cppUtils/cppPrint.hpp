@@ -1544,37 +1544,49 @@ static void initializeStdoutIfNecessary()
 				GetConsoleScreenBufferInfoEx(stdoutHandle, &originalConsoleInfo);
 
 				// Setup a nicer color palette
-				originalConsoleInfo.ColorTable[0] = 0x00'05'05'05; // Black
-				originalConsoleInfo.ColorTable[1] = 0x00'99'37'2E; // Dark Blue
-				originalConsoleInfo.ColorTable[2] = 0x00'37'8A'2C; // Dark Green
-				originalConsoleInfo.ColorTable[3] = 0x00'A3'99'2C; // Dark Cyan
-				originalConsoleInfo.ColorTable[4] = 0x00'24'2C'85; // Dark Red
-				originalConsoleInfo.ColorTable[5] = 0x00'56'24'01; // Dark Magenta (Powershell Blue)
-				originalConsoleInfo.ColorTable[6] = 0x00'2B'B1'BD; // Dark Yellow
-				originalConsoleInfo.ColorTable[7] = 0x00'61'61'61; // Dark Gray
-				originalConsoleInfo.ColorTable[8] = 0x00'B0'B0'B0; // Gray
-				originalConsoleInfo.ColorTable[9] = 0x00'EB'83'5E; // Blue
-				originalConsoleInfo.ColorTable[10] = 0x00'5E'CC'67; // Green
-				originalConsoleInfo.ColorTable[11] = 0x00'DE'DC'66; // Cyan
-				originalConsoleInfo.ColorTable[12] = 0x00'66'70'DE; // Red
-				originalConsoleInfo.ColorTable[13] = 0x00'E6'67'B3; // Magenta
-				originalConsoleInfo.ColorTable[14] = 0x00'72'EC'F2; // Yellow
-				originalConsoleInfo.ColorTable[15] = 0x00'FF'FF'FF; // White
+				originalConsoleInfo.ColorTable[0] = 0x00'0c'0c'0c; // Black
+				originalConsoleInfo.ColorTable[1] = 0x00'da'37'00; // Dark Blue
+				originalConsoleInfo.ColorTable[2] = 0x00'0e'9d'13; // Dark Green
+				originalConsoleInfo.ColorTable[3] = 0x00'cf'8d'37; // Dark Cyan
+				originalConsoleInfo.ColorTable[4] = 0x00'1e'0f'bd; // Dark Red
+				originalConsoleInfo.ColorTable[5] = 0x00'98'17'88; // Dark Magenta (Powershell Blue)
+				originalConsoleInfo.ColorTable[6] = 0x00'00'9b'bf; // Dark Yellow
+				originalConsoleInfo.ColorTable[7] = 0x00'b6'b6'b6; // Dark Gray
+				originalConsoleInfo.ColorTable[8] = 0x00'76'76'76; // Gray
+				originalConsoleInfo.ColorTable[9] = 0x00'ff'78'3b; // Blue
+				originalConsoleInfo.ColorTable[10] = 0x00'0c'c6'16; // Green
+				originalConsoleInfo.ColorTable[11] = 0x00'd6'd6'61; // Cyan
+				originalConsoleInfo.ColorTable[12] = 0x00'55'48'e5; // Red
+				originalConsoleInfo.ColorTable[13] = 0x00'9e'00'b4; // Magenta
+				originalConsoleInfo.ColorTable[14] = 0x00'a5'f1'f9; // Yellow
+				originalConsoleInfo.ColorTable[15] = 0x00'f2'f2'f2; // White
 
 				WORD backgroundColor = originalConsoleInfo.wAttributes & 0xF0;
 				originalConsoleInfo.wAttributes = backgroundColor | consoleColorToForegroundColor(ConsoleColor::WHITE);
 
+				// Reset the size to a reasonable size
+				_SMALL_RECT sr;
+				sr.Left = 0;
+				sr.Top = 0;
+				sr.Right = 120;
+				sr.Bottom = 25;
+
+				if (originalConsoleInfo.srWindow.Right < sr.Right)
+					originalConsoleInfo.srWindow.Right = sr.Right + 1;
+				if (originalConsoleInfo.srWindow.Bottom < sr.Bottom)
+					originalConsoleInfo.srWindow.Bottom = sr.Bottom + 1;
+
 				SetConsoleScreenBufferInfoEx(stdoutHandle, &originalConsoleInfo);
+				SetConsoleWindowInfo(stdoutHandle, FALSE, &sr);
 			}
 
 			DWORD nfont = 0;
-			COORD fontSize = GetConsoleFontSize(stdoutHandle, nfont);
 
 			CONSOLE_FONT_INFOEX cfi;
 			cfi.cbSize = sizeof(cfi);
 			cfi.nFont = nfont;
-			cfi.dwFontSize.X = fontSize.X;
-			cfi.dwFontSize.Y = fontSize.Y;
+			cfi.dwFontSize.X = 0;
+			cfi.dwFontSize.Y = 20;
 			cfi.FontWeight = 400;
 			cfi.FontFamily = TMPF_TRUETYPE;
 			cfi.FontWeight = FW_NORMAL;
