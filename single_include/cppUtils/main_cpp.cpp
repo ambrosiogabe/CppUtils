@@ -832,9 +832,41 @@ void setupThreadPoolTestSuite()
 namespace CppUtilsTestSuite
 {
 
+DEFINE_BEFORE_EACH(beforeEach)
+{
+	g_logger_info("Before each.");
+	END_BEFORE_EACH;
+}
+
+DEFINE_AFTER_EACH(afterEach)
+{
+	g_logger_info("After each.");
+	END_AFTER_EACH;
+}
+
+DEFINE_BEFORE_ALL(beforeAll)
+{
+	g_logger_info("Before all");
+	END_BEFORE_ALL;
+}
+
+DEFINE_AFTER_ALL(afterAll)
+{
+	g_logger_info("After all");
+	END_BEFORE_ALL;
+}
+
 DEFINE_TEST(dummy)
 {
+	g_logger_info("Dummy 1");
 	ASSERT_TRUE(false);
+	END_TEST;
+}
+
+DEFINE_TEST(dummy2)
+{
+	g_logger_info("Dummy 2");
+	ASSERT_TRUE(true);
 	END_TEST;
 }
 
@@ -842,7 +874,14 @@ void setupCppUtilsTestSuite()
 {
 	Tests::TestSuite& testSuite = Tests::addTestSuite("cppUtils.hpp");
 
+	ADD_BEFORE_EACH(testSuite, beforeEach);
+	ADD_AFTER_EACH(testSuite, afterEach);
+
+	ADD_BEFORE_ALL(testSuite, beforeAll);
+	ADD_AFTER_ALL(testSuite, afterAll);
+
 	ADD_TEST(testSuite, dummy);
+	ADD_TEST(testSuite, dummy2);
 }
 
 }

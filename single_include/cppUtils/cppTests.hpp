@@ -42,13 +42,21 @@
    
    * Adds test with `testName` to the testSuite
 
- ADD_BEFORE_EACH(testSuite, testName)
+ ADD_BEFORE_EACH(testSuite, functionName)
 
-   * Will run the function described by `testName` before each test in the test suite
+   * Will run the function described by `functionName` before each test in the test suite
 
- ADD_AFTER_EACH(testSuite, testName)
+ ADD_AFTER_EACH(testSuite, functionName)
 
-   * Will run the function described by `testName` after each test in the test suite
+   * Will run the function described by `functionName` after each test in the test suite
+
+ ADD_BEFORE_ALL(testSuite, functionName)
+
+   * Will run the function described by `functionName` before all tests in suite are run
+
+ ADD_AFTER_EACH(testSuite, functionName)
+
+   * Will run the function described by `functionName` after all tests in suite are run
 
  ASSERT_TRUE(val)
  ASSERT_FALSE(val)
@@ -86,9 +94,12 @@
  void addTest(TestSuite& testSuite, const char* testName, TestFn fn);
  void setBeforeEach(TestSuite& testSuite, const char* testName, TestFn fn);
  void setAfterEach(TestSuite& testSuite, const char* testName, TestFn fn);
+ void setBeforeAll(TestSuite& testSuite, const char* functionName, TestFn fn);
+ void setAfterAll(TestSuite& testSuite, const char* functionName, TestFn fn);
 
-	* Used to add a test/beforeEach/afterEach to a test suite. The 
-	  ADD_TEST/ADD_BEFORE_EACH/ADD_AFTER_EACH helper macros are preferrable here.
+	* Used to add a test/beforeEach/afterEach/beforeAll/afterAll to a test suite. The 
+	  ADD_TEST/ADD_BEFORE_EACH/ADD_AFTER_EACH/ADD_BEFORE_ALL/ADD_AFTER_ALL helper macros 
+	  are preferrable here.
 
  void runTests();
 
@@ -171,7 +182,7 @@ void main()
 
  -------- DLL STUFF --------
 
- This library is not intended to be used as a DLL. You should statically link.
+ This library is not intended to be used as a DLL. You should statically link it.
 
  If you have a use-case for dynamic linking, feel free to open an issue on the Github repository.
 */
@@ -180,8 +191,10 @@ void main()
 #define GABE_CPP_UTILS_TESTS_H
 
 #define ADD_TEST(testSuite, testName) Tests::addTest(testSuite, #testName, testName)
-#define ADD_BEFORE_EACH(testSuite, testName) Tests::setBeforeEach(testSuite, #testName, testName)
-#define ADD_AFTER_EACH(testSuite, testName) Tests::setAfterEach(testSuite, #testName, testName)
+#define ADD_BEFORE_EACH(testSuite, functionName) Tests::setBeforeEach(testSuite, #functionName, functionName)
+#define ADD_AFTER_EACH(testSuite, functionName) Tests::setAfterEach(testSuite, #functionName, functionName)
+#define ADD_BEFORE_ALL(testSuite, functionName) Tests::setBeforeAll(testSuite, #functionName, functionName)
+#define ADD_AFTER_ALL(testSuite, functionName) Tests::setAfterAll(testSuite, #functionName, functionName)
 
 #define ASSERT_TRUE(val) { if (!(val)) return u8"ASSERT_TRUE("#val")"; }
 #define ASSERT_FALSE(val) { if (val) return u8"ASSERT_FALSE("#val")"; }
@@ -201,6 +214,12 @@ void main()
 #define DEFINE_AFTER_EACH(fnName) const char* fnName()
 #define END_AFTER_EACH return nullptr 
 
+#define DEFINE_BEFORE_ALL(fnName) const char* fnName()
+#define END_BEFORE_ALL return nullptr
+
+#define DEFINE_AFTER_ALL(fnName) const char* fnName()
+#define END_AFTER_ALL return nullptr 
+
 namespace CppUtils
 {
 namespace Tests
@@ -213,8 +232,11 @@ TestSuite& addTestSuite(const char* testSuiteName);
 
 void addTest(TestSuite& testSuite, const char* testName, TestFn fn);
 
-void setBeforeEach(TestSuite& testSuite, const char* testName, TestFn fn);
-void setAfterEach(TestSuite& testSuite, const char* testName, TestFn fn);
+void setBeforeEach(TestSuite& testSuite, const char* functionName, TestFn fn);
+void setAfterEach(TestSuite& testSuite, const char* functionName, TestFn fn);
+
+void setBeforeAll(TestSuite& testSuite, const char* functionName, TestFn fn);
+void setAfterAll(TestSuite& testSuite, const char* functionName, TestFn fn);
 
 void runTests();
 
@@ -256,6 +278,9 @@ struct TestSuite
 
 	TestPrototype beforeEach = {};
 	TestPrototype afterEach = {};
+
+	TestPrototype beforeAll = {};
+	TestPrototype afterAll = {};
 };
 
 // ----------------- Internal variables -----------------
@@ -291,14 +316,24 @@ void addTest(TestSuite& testSuite, const char* testName, TestFn fn)
 	testSuite.tests[testSuite.testsLength - 1] = test;
 }
 
-void setBeforeEach(TestSuite& testSuite, const char* testName, TestFn fn)
+void setBeforeEach(TestSuite& testSuite, const char* functionName, TestFn fn)
 {
-	testSuite.beforeEach = createTestPrototype(testName, fn);
+	testSuite.beforeEach = createTestPrototype(functionName, fn);
 }
 
-void setAfterEach(TestSuite& testSuite, const char* testName, TestFn fn)
+void setAfterEach(TestSuite& testSuite, const char* functionName, TestFn fn)
 {
-	testSuite.afterEach = createTestPrototype(testName, fn);
+	testSuite.afterEach = createTestPrototype(functionName, fn);
+}
+
+void setBeforeAll(TestSuite& testSuite, const char* functionName, TestFn fn)
+{
+	testSuite.beforeAll = createTestPrototype(functionName, fn);
+}
+
+void setAfterAll(TestSuite& testSuite, const char* functionName, TestFn fn)
+{
+	testSuite.afterAll = createTestPrototype(functionName, fn);
 }
 
 void runTests()
@@ -391,6 +426,11 @@ static void runTestSuite(void* testSuiteRaw, size_t testSuiteSize)
 	g_logger_assert(testSuiteSize == sizeof(TestSuite), "Invalid data passed to runTestSuite");
 	TestSuite* testSuite = (TestSuite*)testSuiteRaw;
 
+	if (testSuite->beforeAll.fn)
+	{
+		testSuite->beforeAll.fn();
+	}
+
 	for (size_t i = 0; i < testSuite->testsLength; i++)
 	{
 		if (testSuite->beforeEach.fn)
@@ -415,6 +455,11 @@ static void runTestSuite(void* testSuiteRaw, size_t testSuiteSize)
 		{
 			testSuite->afterEach.fn();
 		}
+	}
+
+	if (testSuite->afterAll.fn)
+	{
+		testSuite->afterAll.fn();
 	}
 }
 
