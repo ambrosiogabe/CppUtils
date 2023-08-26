@@ -403,13 +403,12 @@ void free()
 			freeTestPrototype(testSuite.tests[i]);
 		}
 
-		if (testSuite.tests)
-		{
-			g_memory_free(testSuite.tests);
-		}
+		g_memory_free(testSuite.tests);
 
 		freeTestPrototype(testSuite.beforeEach);
 		freeTestPrototype(testSuite.afterEach);
+		freeTestPrototype(testSuite.beforeAll);
+		freeTestPrototype(testSuite.afterAll);
 
 		testSuite.tests = nullptr;
 		testSuite.numTestsPassed = 0;
@@ -446,9 +445,10 @@ static void runTestSuite(void* testSuiteRaw, size_t testSuiteSize)
 		}
 		else
 		{
-			size_t strLength = std::strlen(result) + 1;
-			testSuite->tests[i].testResult = (char*)g_memory_allocate(sizeof(char) * strLength);
-			g_memory_copyMem(testSuite->tests[i].testResult, (void*)result, strLength);
+			size_t strLengthWithNullByte = std::strlen(result) + 1;
+			testSuite->tests[i].testResult = (char*)g_memory_allocate(sizeof(char) * strLengthWithNullByte);
+			testSuite->tests[i].nameLength = strLengthWithNullByte - 1;
+			g_memory_copyMem(testSuite->tests[i].testResult, testSuite->tests[i].nameLength + 1, (void*)result, strLengthWithNullByte);
 		}
 
 		if (testSuite->afterEach.fn)
@@ -522,22 +522,15 @@ static TestPrototype createTestPrototype(const char* testName, TestFn fn)
 	test.fn = fn;
 	test.nameLength = std::strlen(testName);
 	test.name = (uint8*)g_memory_allocate(sizeof(uint8) * (test.nameLength + 1));
-	g_memory_copyMem(test.name, (void*)testName, sizeof(uint8) * test.nameLength);
+	g_memory_copyMem(test.name, test.nameLength, (void*)testName, sizeof(uint8) * test.nameLength);
 	test.name[test.nameLength] = '\0';
 	return test;
 }
 
 static void freeTestPrototype(TestPrototype& test)
 {
-	if (test.name)
-	{
-		g_memory_free(test.name);
-	}
-
-	if (test.testResult)
-	{
-		g_memory_free(test.testResult);
-	}
+	g_memory_free(test.name);
+	g_memory_free(test.testResult);
 
 	test.name = nullptr;
 	test.nameLength = 0;

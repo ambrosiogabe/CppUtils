@@ -83,3 +83,7 @@ set_property(
     PROPERTY VS_STARTUP_PROJECT CppUtilsTestC
 )
 
+add_custom_command(TARGET CppUtilsTestC 
+    PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/logs)
+add_custom_command(TARGET CppUtilsTestCpp 
+    PRE_BUILD COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/logs)

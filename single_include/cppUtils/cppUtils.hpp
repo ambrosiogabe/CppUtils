@@ -54,23 +54,36 @@
   - bufferPadding       -- This is how many extra bytes will be allocated at the start and end of
 						   each memory allocation. I advise that you set this to a very low
 						   number, like 1-2 bytes, if you plan on releasing your app with this turned on.
+g_memory_init_padding_zeroed(bool detectMemoryLeaks, uint16 bufferPadding, bool zeroMemoryOnAllocate)
+  - Same as the above two functions. If zeroMemoryOnAllocate is set to true, than all memory
+    allocated will be zeroed out before being returned.
 
  g_memory_dumpMemoryLeaks();
  g_memory_deinit();
 
- NOTE: Only memory allocated using this function will be tracked
+ NOTE: Only memory allocated using this function or the new operator (in C++) will be tracked
 	g_memory_allocate(size_t numBytes)
+	new Object(...)
+	new Object[10];
 
- NOTE: Call this on any memory allocated with the above function to properly track it
+	// PLACEMENT NEW NOT SUPPORTED. 
+	// Placement new won't work because of some limitations with macro magic, so the following does not work if
+	// you use this library:
+	new(memory)Object();
+
+ NOTE: Call this on any memory allocated with the above function (or delete in C++) to properly track it
 	g_memory_free(void* memory)
+	  - g_memory_free(NULL) is a no op. So you can safely pass NULL, or nullptr to g_memory_free.
+	delete memory;
+	delete[] memory;
 
  NOTE: Only call this on memory that was allocated using the above function
 	g_memory_realloc(void* memory, size_t newSize)
 
  Miscellaneous memory functions:
-	g_memory_compareMem(void* a, void* b, size_t numBytes)
+	g_memory_compareMem(void* a, size_t aNumBytes, void* b, size_t bNumBytes)
 	g_memory_zeroMem(void* memory, size_t numBytes);
-	g_memory_copyMem(void* dst, void* src, size_t numBytes);
+	g_memory_copyMem(void* dst, size_t dstNumBytes, void* src, size_t srcNumBytes);
 
 
 
@@ -122,6 +135,12 @@
 	g_logger_warning(const char* format, ...args)
 	g_logger_error(const char* format, ...args)
 	g_logger_assert(bool condition, const char* failureFormat, ...args)
+
+	All these overridden in C++:
+	new
+	new[]
+	delete
+	delete[] 
 
  -------- FUNCTION DESCRIPTIONS --------
 
@@ -175,6 +194,10 @@
 #include <stdbool.h>
 
 #ifdef __cplusplus
+
+void* operator new(size_t size, const char* filename, int line);
+void operator delete(void* memory, const char* filename, int line);
+
 extern "C" {
 #endif
 
@@ -191,6 +214,9 @@ extern "C" {
 	typedef uint32_t uint32;
 	typedef uint64_t uint64;
 
+#define new new(__FILE__, __LINE__)
+#define delete delete(__FILE__, __LINE__)
+
 #define g_memory_allocate(numBytes) _g_memory_allocate(__FILE__, __LINE__, numBytes)
 #define g_memory_realloc(memory, newSize) _g_memory_realloc(__FILE__, __LINE__, memory, newSize)
 #define g_memory_free(memory) _g_memory_free(__FILE__, __LINE__, memory)
@@ -201,12 +227,13 @@ extern "C" {
 
 	GABE_CPP_UTILS_API void g_memory_init(bool detectMemoryLeaks);
 	GABE_CPP_UTILS_API void g_memory_init_padding(bool detectMemoryLeaks, uint16 bufferPadding);
+	GABE_CPP_UTILS_API void g_memory_init_padding_zeroed(bool detectMemoryLeaks, uint16 bufferPadding, bool zeroMemoryOnAllocate);
 	GABE_CPP_UTILS_API void g_memory_deinit(void);
 	GABE_CPP_UTILS_API void g_memory_dumpMemoryLeaks(void);
 
 	GABE_CPP_UTILS_API bool g_memory_compareMem(void* a, size_t aLength, void* b, size_t bLength);
 	GABE_CPP_UTILS_API void g_memory_zeroMem(void* memory, size_t numBytes);
-	GABE_CPP_UTILS_API void g_memory_copyMem(void* dst, void* src, size_t numBytes);
+	GABE_CPP_UTILS_API void g_memory_copyMem(void* dst, size_t dstNumBytes, void* src, size_t srcNumBytes);
 
 	// ----------------------------------
 	// Logging Utils
@@ -352,6 +379,29 @@ GABE_CPP_UTILS_API void _g_logger_gabeAssert(const char* filename, int line, boo
 #include <stdlib.h>
 #include <time.h>
 
+// Overriding new/delete operators
+#ifdef __cplusplus
+
+#ifdef new 
+#undef new
+#endif
+
+#ifdef delete
+#undef delete
+#endif
+
+void* operator new(size_t size, const char* filename, int line)
+{
+	void* ptr = _g_memory_allocate(filename, line, size);
+	return ptr;
+}
+
+void operator delete(void* memory, const char* filename, int line) 
+{
+	_g_memory_free(filename, line, memory);
+}
+#endif 
+
 #ifdef _WIN32
 // Ignore Win32 warnings
 #pragma warning( push )
@@ -436,9 +486,11 @@ static void gma_DebugMemoryAllocationList_init(gma_DebugMemoryAllocationList* li
 static void* memoryMtx = NULL;
 static gma_DebugMemoryAllocationList allocations;
 static bool trackMemoryAllocations = false;
-#define specialMemoryFlagsSize 8
-static const uint8 specialMemoryFlags[specialMemoryFlagsSize] = { (uint8)'h', (uint8)'e', (uint8)'Y', (uint8)'G' , (uint8)'a', (uint8)'b', (uint8)'e', (uint8)'!' };
+static bool zeroMemoryOnAllocate = false;
 static uint16 bufferPadding = 5;
+
+#define I_HAT 238
+static uint8* cleanPaddingBytes = NULL;
 
 void g_memory_init(bool detectMemoryErrors)
 {
@@ -447,10 +499,23 @@ void g_memory_init(bool detectMemoryErrors)
 
 void g_memory_init_padding(bool detectMemoryErrors, uint16 inBufferPadding)
 {
+	g_memory_init_padding_zeroed(detectMemoryErrors, inBufferPadding, FALSE);
+}
+
+void g_memory_init_padding_zeroed(bool detectMemoryErrors, uint16 inBufferPadding, bool inZeroMemoryOnAllocate)
+{
 	trackMemoryAllocations = detectMemoryErrors;
 	bufferPadding = inBufferPadding;
 	gma_DebugMemoryAllocationList_init(&allocations);
 	memoryMtx = g_thread_createMutexUntracked();
+	zeroMemoryOnAllocate = inZeroMemoryOnAllocate;
+
+	cleanPaddingBytes = (uint8*)malloc(inBufferPadding);
+	for (uint16 i = 0; i < bufferPadding; i++)
+	{
+		// Set padding bytes to i with a hat
+		cleanPaddingBytes[i] = I_HAT;
+	}
 }
 
 void g_memory_deinit(void)
@@ -459,24 +524,35 @@ void g_memory_deinit(void)
 	{
 		g_thread_freeMutexUntracked(memoryMtx);
 	}
+
+	free(cleanPaddingBytes);
+}
+
+static inline uint8* copyPostPaddingBits(uint8* memoryBase, size_t numBytes)
+{
+	uint8* paddingBytes = ((uint8*)memoryBase) + numBytes - bufferPadding;
+	uint8* paddingBytesCopy = (uint8*)malloc(sizeof(char) * bufferPadding);
+	g_memory_copyMem(paddingBytesCopy, bufferPadding, paddingBytes, sizeof(char) * bufferPadding);
+	return paddingBytesCopy;
+}
+
+static inline void copyPostPaddingToPostMemory(uint8* memoryBase, size_t numBytes, uint8* postBytesCopy)
+{
+	uint8* paddingBytesPtr = ((uint8*)memoryBase) + numBytes - bufferPadding;
+	g_memory_copyMem(paddingBytesPtr, bufferPadding, postBytesCopy, sizeof(char) * bufferPadding);
+	free(postBytesCopy);
 }
 
 static inline void setMemoryPaddingPost(uint8* memoryBase, size_t numBytes)
 {
-	uint8* memoryBytes = ((uint8*)memoryBase) + numBytes - bufferPadding;
-	for (uint16 i = 0; i < bufferPadding; i++)
-	{
-		memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
-	}
+	uint8* paddingBytes = ((uint8*)memoryBase) + numBytes - bufferPadding;
+	g_memory_copyMem(paddingBytes, bufferPadding, cleanPaddingBytes, bufferPadding);
 }
 
 static inline void setMemoryPaddingPre(uint8* memoryBase)
 {
-	uint8* memoryBytes = (uint8*)memoryBase;
-	for (uint16 i = 0; i < bufferPadding; i++)
-	{
-		memoryBytes[i] = specialMemoryFlags[i % specialMemoryFlagsSize];
-	}
+	uint8* paddingBytes = (uint8*)memoryBase;
+	g_memory_copyMem(paddingBytes, bufferPadding, cleanPaddingBytes, bufferPadding);
 }
 
 void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
@@ -490,7 +566,9 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 		// In debug mode we allocate 10 extra bytes, 5 before the block and 5 after. We can use these to detect
 		// Buffer overruns or underruns
 		// TODO: Might be cool to inject malloc like vulkan to allow custom allocators
-		void* memory = malloc(numBytes);
+		void* memory = zeroMemoryOnAllocate
+			? calloc(1, numBytes)
+			: malloc(numBytes);
 		if (memory)
 		{
 			setMemoryPaddingPre((uint8*)memory);
@@ -531,8 +609,10 @@ void* _g_memory_allocate(const char* filename, int line, size_t numBytes)
 		return (void*)((uint8*)memory + bufferPadding);
 	}
 
-	// If we aren't tracking memory, just return malloc
-	return malloc(numBytes);
+	// If we aren't tracking memory, just return malloc/calloc
+	return zeroMemoryOnAllocate
+		? calloc(1, numBytes)
+		: malloc(numBytes);
 }
 
 void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t numBytes)
@@ -551,7 +631,9 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 		// If numBytes is 0 then that's undefined behavior
 		if (numBytes == 0)
 		{
-			g_logger_warning("Realloc called with newSize of 0 bytes. This is undefined behavior.\n\trealloc(ptr, 0) is undefined.");
+			g_logger_warning("Realloc called with newSize of 0 bytes. This is undefined behavior.\n\trealloc(ptr, 0) is undefined, but we'll free the memory and return NULL since that's what the programmer probably expected.");
+			_g_memory_free(filename, line, oldMemory);
+			return NULL;
 		}
 
 		g_thread_lockMutex(memoryMtx);
@@ -566,6 +648,10 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 		};
 		gma_DebugMemoryAllocation* oldMemoryIter = gma_DebugMemoryAllocation_find(&allocations, &tmp);
 		numBytes += bufferPadding * 2 * sizeof(uint8);
+
+		// Copy padding bits so that we can retain any heap corruption errors
+		uint8* paddingBitsCopy = copyPostPaddingBits((uint8*)oldMemoryIter->memory, oldMemoryIter->memorySize);
+
 		void* newMemory = realloc(oldMemory, numBytes);
 
 		if (oldMemoryIter != NULL)
@@ -581,10 +667,12 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 			g_logger_error("This should never be hit. Realloc was called with memory that wasn't allocated by this library.");
 		}
 
-		// Clear the padding bits after the new allocation just in case the new allocation
+		// Copy the padding bits after the new allocation just in case the new allocation
 		// is smaller. This way a valid memory write doesn't get misinterpreted as a buffer
-		// overrun
-		setMemoryPaddingPost((uint8*)newMemory, numBytes);
+		// overrun, but if there was corruption previously it will still be detected.
+		// Note: paddingBitsCopy gets freed in this function call
+		copyPostPaddingToPostMemory((uint8*)newMemory, numBytes, paddingBitsCopy);
+		paddingBitsCopy = NULL;
 
 		// If we are in a debug build, track all memory allocations to see if we free them all as well
 		gma_DebugMemoryAllocation newTmp = {
@@ -630,11 +718,17 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 	}
 
 	// If we're not tracking allocations, just return realloc
-	return realloc(oldMemory, numBytes);;
+	return realloc(oldMemory, numBytes);
 }
 
 void _g_memory_free(const char* filename, int line, void* memory)
 {
+	// g_memory_free(NULL) is a NOP
+	if (memory == NULL) 
+	{
+		return;
+	}
+
 	if (trackMemoryAllocations)
 	{
 		memory = (void*)((uint8*)memory - bufferPadding);
@@ -679,7 +773,7 @@ void _g_memory_free(const char* filename, int line, void* memory)
 				uint8* memoryBytes = (uint8*)memory;
 				for (int i = 0; i < bufferPadding; i++)
 				{
-					if (memoryBytes[i] != specialMemoryFlags[i % specialMemoryFlagsSize])
+					if (memoryBytes[i] != I_HAT)
 					{
 #ifndef USE_GABE_CPP_PRINT
 						g_logger_warning("Heap corruption detected. Buffer underrun in memory allocated from: '%s' line: %d", iterator->fileAllocator, iterator->fileAllocatorLine);
@@ -693,7 +787,7 @@ void _g_memory_free(const char* filename, int line, void* memory)
 				memoryBytes = (uint8*)memory + iterator->memorySize - bufferPadding;
 				for (int i = 0; i < bufferPadding; i++)
 				{
-					if (memoryBytes[i] != specialMemoryFlags[i % specialMemoryFlagsSize])
+					if (memoryBytes[i] != I_HAT)
 					{
 #ifndef USE_GABE_CPP_PRINT
 						g_logger_warning("Heap corruption detected. Buffer overrun in memory allocated from: '%s' line: %d", iterator->fileAllocator, iterator->fileAllocatorLine);
@@ -745,9 +839,14 @@ void g_memory_zeroMem(void* memory, size_t numBytes)
 	memset(memory, 0, numBytes);
 }
 
-void g_memory_copyMem(void* dst, void* src, size_t numBytes)
+void g_memory_copyMem(void* dst, size_t dstNumBytes, void* src, size_t srcNumBytes)
 {
-	memcpy(dst, src, numBytes);
+#ifdef USE_GABE_CPP_PRINT
+	g_logger_assert(dstNumBytes >= srcNumBytes, "Cannot do g_memory_copyMem. Dst size '{}' is not big enough for src size '{}'.", dstNumBytes, srcNumBytes);
+#else 
+	g_logger_assert(dstNumBytes >= srcNumBytes, "Cannot do g_memory_copyMem. Dst size '%llu' is not big enough for src size '%llu'.", dstNumBytes, srcNumBytes);
+#endif
+	memcpy(dst, src, srcNumBytes);
 }
 
 
@@ -838,7 +937,7 @@ void g_logger_set_log_directory(const char* directory)
 	fopen_s(&logFile, logFilePath, "wb");
 	if (!logFile)
 	{
-		printf("Failed to open file '%s' to log to. Please make sure the log directory exists, otherwise this will fail.", directory);
+		printf("Failed to open file '%s' to log to. Please make sure the log directory exists, otherwise this will fail.\n", logFilePath);
 		free(logFilePath);
 		logFilePath = NULL;
 	}

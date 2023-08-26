@@ -202,7 +202,7 @@ Maybe<BasicString, Utf8ErrorCode> makeString(const char* rawString)
 
 	uint8_t* dumbString = (uint8_t*)g_memory_allocate((numBytes + 1) * sizeof(uint8_t));
 
-	g_memory_copyMem(dumbString, (void*)rawString, numBytes * sizeof(uint8_t));
+	g_memory_copyMem(dumbString, (numBytes + 1) * sizeof(uint8_t), (void*)rawString, numBytes * sizeof(uint8_t));
 	dumbString[numBytes] = '\0';
 
 	return BasicString{

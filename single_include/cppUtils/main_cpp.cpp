@@ -29,96 +29,96 @@ using namespace CppUtils;
 // -------------------- String Test Suite --------------------
 namespace StringTestSuite
 {
-DEFINE_TEST(utf8String_C080_ShouldBeBad)
-{
-	const uint8_t invalidUtf8Data[] = { 0xc0, 0x80, 0x00 };
-	auto badString = String::makeString((const char*)invalidUtf8Data);
+	DEFINE_TEST(utf8String_C080_ShouldBeBad)
+	{
+		const uint8_t invalidUtf8Data[] = { 0xc0, 0x80, 0x00 };
+		auto badString = String::makeString((const char*)invalidUtf8Data);
 
-	ASSERT_FALSE(badString.hasValue());
-	ASSERT_EQUAL(badString.error(), Utf8ErrorCode::InvalidString)
+		ASSERT_FALSE(badString.hasValue());
+		ASSERT_EQUAL(badString.error(), Utf8ErrorCode::InvalidString)
 
-		// NOTE: This is unnecessary since the string won't allocate if it's an invalid UTF8 string
-		//       but it's nice in case you're not checking for that type of stuff and just want to
-		//       pass the data forwards whether it's valid or not
-		String::free(badString);
-
-	END_TEST;
-}
-
-DEFINE_TEST(utf8String_EDA18CEDBEB4_ShouldBeBad)
-{
-	const uint8_t invalidUtf8Data[] = { 0xED, 0xA1, 0x8C, 0xED, 0xBE, 0xB4 };
-	auto badString = String::makeString((const char*)invalidUtf8Data);
-
-	ASSERT_FALSE(badString.hasValue());
-	ASSERT_EQUAL(badString.error(), Utf8ErrorCode::InvalidString)
+			// NOTE: This is unnecessary since the string won't allocate if it's an invalid UTF8 string
+			//       but it's nice in case you're not checking for that type of stuff and just want to
+			//       pass the data forwards whether it's valid or not
+			String::free(badString);
 
 		END_TEST;
-}
+	}
 
-DEFINE_TEST(validUtf8String_ShouldSucceed)
-{
-	const char rawStringLiteral[] = u8"Hello World!";
-	auto maybeString = String::makeString(rawStringLiteral);
+	DEFINE_TEST(utf8String_EDA18CEDBEB4_ShouldBeBad)
+	{
+		const uint8_t invalidUtf8Data[] = { 0xED, 0xA1, 0x8C, 0xED, 0xBE, 0xB4 };
+		auto badString = String::makeString((const char*)invalidUtf8Data);
 
-	ASSERT_TRUE(maybeString.hasValue());
+		ASSERT_FALSE(badString.hasValue());
+		ASSERT_EQUAL(badString.error(), Utf8ErrorCode::InvalidString)
 
-	const BasicString& string = maybeString.value();
+			END_TEST;
+	}
 
-	ASSERT_EQUAL(string.numCharacters, sizeof(rawStringLiteral) - 1);
-	ASSERT_EQUAL(string.numBytes, sizeof(rawStringLiteral) - 1);
-	ASSERT_EQUAL(string, String::makeConstantString("Hello World!").value());
+	DEFINE_TEST(validUtf8String_ShouldSucceed)
+	{
+		const char rawStringLiteral[] = u8"Hello World!";
+		auto maybeString = String::makeString(rawStringLiteral);
 
-	String::free(maybeString.mut_value());
+		ASSERT_TRUE(maybeString.hasValue());
 
-	END_TEST;
-}
+		const BasicString& string = maybeString.value();
 
-DEFINE_TEST(validUtf8String_ShouldSucceedWithUnicodeChars)
-{
-	const uint32 numCharacters = 29;
-	const char rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
-	auto maybeString = String::makeString(rawStringLiteral);
+		ASSERT_EQUAL(string.numCharacters, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(string.numBytes, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(string, String::makeConstantString("Hello World!").value());
 
-	ASSERT_TRUE(maybeString.hasValue());
+		String::free(maybeString.mut_value());
 
-	const BasicString& string = maybeString.value();
+		END_TEST;
+	}
 
-	ASSERT_EQUAL(string.numCharacters, numCharacters);
-	ASSERT_EQUAL(string.numBytes, sizeof(rawStringLiteral) - 1);
-	ASSERT_EQUAL(string, String::makeConstantString(u8"\u220f Test some unicode strings \u220f").value());
+	DEFINE_TEST(validUtf8String_ShouldSucceedWithUnicodeChars)
+	{
+		const uint32 numCharacters = 29;
+		const char rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
+		auto maybeString = String::makeString(rawStringLiteral);
 
-	String::free(maybeString.mut_value());
+		ASSERT_TRUE(maybeString.hasValue());
 
-	END_TEST;
-}
+		const BasicString& string = maybeString.value();
 
-void setupCppStringsTestSuite()
-{
-	Tests::TestSuite& testSuite = Tests::addTestSuite("cppStrings.hpp");
+		ASSERT_EQUAL(string.numCharacters, numCharacters);
+		ASSERT_EQUAL(string.numBytes, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(string, String::makeConstantString(u8"\u220f Test some unicode strings \u220f").value());
 
-	ADD_TEST(testSuite, utf8String_C080_ShouldBeBad);
-	ADD_TEST(testSuite, utf8String_EDA18CEDBEB4_ShouldBeBad);
-	ADD_TEST(testSuite, validUtf8String_ShouldSucceed);
-	ADD_TEST(testSuite, validUtf8String_ShouldSucceedWithUnicodeChars);
-}
+		String::free(maybeString.mut_value());
+
+		END_TEST;
+	}
+
+	void setupCppStringsTestSuite()
+	{
+		Tests::TestSuite& testSuite = Tests::addTestSuite("cppStrings.hpp");
+
+		ADD_TEST(testSuite, utf8String_C080_ShouldBeBad);
+		ADD_TEST(testSuite, utf8String_EDA18CEDBEB4_ShouldBeBad);
+		ADD_TEST(testSuite, validUtf8String_ShouldSucceed);
+		ADD_TEST(testSuite, validUtf8String_ShouldSucceedWithUnicodeChars);
+	}
 }
 
 // -------------------- Maybe Test Suite --------------------
 namespace MaybeTestSuite
 {
-DEFINE_TEST(dummy)
-{
-	ASSERT_TRUE(false);
-	END_TEST;
-}
+	DEFINE_TEST(dummy)
+	{
+		ASSERT_TRUE(false);
+		END_TEST;
+	}
 
-void setupMaybeTestSuite()
-{
-	Tests::TestSuite& testSuite = Tests::addTestSuite("cppMaybe.hpp");
+	void setupMaybeTestSuite()
+	{
+		Tests::TestSuite& testSuite = Tests::addTestSuite("cppMaybe.hpp");
 
-	ADD_TEST(testSuite, dummy);
-}
+		ADD_TEST(testSuite, dummy);
+	}
 }
 
 // -------------------- Print Test Suite --------------------
@@ -129,315 +129,218 @@ namespace PrintTestSuite
 #include <io.h>
 #include <fcntl.h>
 
-static HANDLE pipeRead = NULL;
-static HANDLE pipeWrite = NULL;
-static char printBuffer[2048 * 10];
-static HANDLE oldStdoutHandle = INVALID_HANDLE_VALUE;
-static int oldCStdout = 0;
-static const char* stdoutFilename = "testOutput.txt";
+	static HANDLE pipeRead = NULL;
+	static HANDLE pipeWrite = NULL;
+	static char printBuffer[2048 * 10];
+	static HANDLE oldStdoutHandle = INVALID_HANDLE_VALUE;
+	static int oldCStdout = 0;
+	static const char* stdoutFilename = "testOutput.txt";
 
-DEFINE_BEFORE_EACH(setupTest)
-{
-	oldStdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
-
-	BOOL pipeCreateRes = CreatePipe(
-		&pipeRead,
-		&pipeWrite,
-		NULL,
-		sizeof(printBuffer)
-	);
-
-	if (pipeCreateRes == 0)
+	DEFINE_BEFORE_EACH(setupTest)
 	{
-		throw std::runtime_error("Failed to create stdout redirect pipe.");
-	}
+		oldStdoutHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 
-	oldCStdout = _dup(1);
+		BOOL pipeCreateRes = CreatePipe(
+			&pipeRead,
+			&pipeWrite,
+			NULL,
+			sizeof(printBuffer)
+		);
 
-	int fd = _open_osfhandle((intptr_t)pipeWrite, _O_APPEND);
-	int res = _dup2(fd, 1);
-	if (res == -1)
-	{
-		throw std::runtime_error("Failed to redirect stdout to anonymous pipe.");
-	}
-	setvbuf(stdout, NULL, _IONBF, 0); //Disable buffering.
-
-	SetStdHandle(STD_OUTPUT_HANDLE, pipeWrite);
-
-	END_BEFORE_EACH;
-}
-
-DEFINE_AFTER_EACH(teardownTest)
-{
-	if (pipeRead != NULL)
-	{
-		CloseHandle(pipeRead);
-	}
-
-	if (pipeWrite != NULL)
-	{
-		CloseHandle(pipeWrite);
-	}
-
-	SetStdHandle(STD_OUTPUT_HANDLE, oldStdoutHandle);
-
-	int res = _dup2(oldCStdout, 1);
-	if (res == -1)
-	{
-		throw std::runtime_error("Failed to redirect stdout to anonymous pipe.");
-	}
-
-	END_AFTER_EACH;
-}
-
-static const char* compareMemory(const uint8_t* expectedOutput, size_t expectedOutputSize)
-{
-	DWORD numBytesRead;
-	BOOL res = ReadFile(
-		pipeRead,
-		(void*)&printBuffer[0],
-		sizeof(printBuffer),
-		&numBytesRead,
-		NULL
-	);
-
-	ASSERT_NOT_EQUAL(res, 0);
-	ASSERT_EQUAL(numBytesRead, expectedOutputSize * 2);
-
-	bool memoryIsAsExpected = g_memory_compareMem(
-		(uint8_t*)printBuffer, expectedOutputSize,
-		(uint8_t*)expectedOutput, expectedOutputSize
-	);
-	ASSERT_TRUE(memoryIsAsExpected);
-
-	bool memoryIsEqual = g_memory_compareMem(
-		(uint8_t*)printBuffer, expectedOutputSize,
-		(uint8_t*)printBuffer + expectedOutputSize, expectedOutputSize);
-	ASSERT_TRUE(memoryIsEqual);
-
-	return nullptr;
-}
-
-static const char* compareMemoryPrintfOnly(const uint8_t* expectedOutput, size_t expectedOutputSize)
-{
-	DWORD numBytesRead;
-	BOOL res = ReadFile(
-		pipeRead,
-		(void*)&printBuffer[0],
-		sizeof(printBuffer),
-		&numBytesRead,
-		NULL
-	);
-
-	ASSERT_NOT_EQUAL(res, 0);
-	ASSERT_EQUAL(numBytesRead, expectedOutputSize);
-
-	bool memoryIsAsExpected = g_memory_compareMem(
-		(uint8_t*)printBuffer, expectedOutputSize,
-		(uint8_t*)expectedOutput, expectedOutputSize
-	);
-	ASSERT_TRUE(memoryIsAsExpected);
-
-	return nullptr;
-}
-
-DEFINE_TEST(hexOutputIsSameAsPrintf)
-{
-	using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
-	const std::vector<TupleType> tests = {
-		TupleType{     "0XABCD\n",   "%#6X\n",   "{:#6X}\n", 0xABCD },
-		TupleType{     "0xabcd\n",   "%#6x\n",   "{:#6x}\n", 0xABCD },
-		TupleType{       "abcd\n",    "%4x\n",    "{:4x}\n", 0xabcd },
-		TupleType{ "0x0000ffcc\n", "%#010x\n", "{:#010x}\n", 0xffcc }
-	};
-
-	for (size_t i = 0; i < tests.size(); i++)
-	{
-		auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-		printf(cFormatStr.c_str(), number);
-		IO::printf(myFormatStr.c_str(), number);
-
-		const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-		if (res)
+		if (pipeCreateRes == 0)
 		{
-			return res;
+			throw std::runtime_error("Failed to create stdout redirect pipe.");
 		}
+
+		oldCStdout = _dup(1);
+
+		int fd = _open_osfhandle((intptr_t)pipeWrite, _O_APPEND);
+		int res = _dup2(fd, 1);
+		if (res == -1)
+		{
+			throw std::runtime_error("Failed to redirect stdout to anonymous pipe.");
+		}
+		setvbuf(stdout, NULL, _IONBF, 0); //Disable buffering.
+
+		SetStdHandle(STD_OUTPUT_HANDLE, pipeWrite);
+
+		END_BEFORE_EACH;
 	}
 
-	END_TEST;
-}
+	DEFINE_AFTER_EACH(teardownTest)
+	{
+		if (pipeRead != NULL)
+		{
+			CloseHandle(pipeRead);
+		}
 
-DEFINE_TEST(floatOutputIsSameAsPrintf)
-{
+		if (pipeWrite != NULL)
+		{
+			CloseHandle(pipeWrite);
+		}
+
+		SetStdHandle(STD_OUTPUT_HANDLE, oldStdoutHandle);
+
+		int res = _dup2(oldCStdout, 1);
+		if (res == -1)
+		{
+			throw std::runtime_error("Failed to redirect stdout to anonymous pipe.");
+		}
+
+		END_AFTER_EACH;
+	}
+
+	static const char* compareMemory(const uint8_t* expectedOutput, size_t expectedOutputSize)
+	{
+		DWORD numBytesRead;
+		BOOL res = ReadFile(
+			pipeRead,
+			(void*)&printBuffer[0],
+			sizeof(printBuffer),
+			&numBytesRead,
+			NULL
+		);
+
+		ASSERT_NOT_EQUAL(res, 0);
+		ASSERT_EQUAL(numBytesRead, expectedOutputSize * 2);
+
+		bool memoryIsAsExpected = g_memory_compareMem(
+			(uint8_t*)printBuffer, expectedOutputSize,
+			(uint8_t*)expectedOutput, expectedOutputSize
+		);
+		ASSERT_TRUE(memoryIsAsExpected);
+
+		bool memoryIsEqual = g_memory_compareMem(
+			(uint8_t*)printBuffer, expectedOutputSize,
+			(uint8_t*)printBuffer + expectedOutputSize, expectedOutputSize);
+		ASSERT_TRUE(memoryIsEqual);
+
+		return nullptr;
+	}
+
+	static const char* compareMemoryPrintfOnly(const uint8_t* expectedOutput, size_t expectedOutputSize)
+	{
+		DWORD numBytesRead;
+		BOOL res = ReadFile(
+			pipeRead,
+			(void*)&printBuffer[0],
+			sizeof(printBuffer),
+			&numBytesRead,
+			NULL
+		);
+
+		ASSERT_NOT_EQUAL(res, 0);
+		ASSERT_EQUAL(numBytesRead, expectedOutputSize);
+
+		bool memoryIsAsExpected = g_memory_compareMem(
+			(uint8_t*)printBuffer, expectedOutputSize,
+			(uint8_t*)expectedOutput, expectedOutputSize
+		);
+		ASSERT_TRUE(memoryIsAsExpected);
+
+		return nullptr;
+	}
+
+	DEFINE_TEST(hexOutputIsSameAsPrintf)
+	{
+		using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
+		const std::vector<TupleType> tests = {
+			TupleType{     "0XABCD\n",   "%#6X\n",   "{:#6X}\n", 0xABCD },
+			TupleType{     "0xabcd\n",   "%#6x\n",   "{:#6x}\n", 0xABCD },
+			TupleType{       "abcd\n",    "%4x\n",    "{:4x}\n", 0xabcd },
+			TupleType{ "0x0000ffcc\n", "%#010x\n", "{:#010x}\n", 0xffcc }
+		};
+
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
+
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(floatOutputIsSameAsPrintf)
+	{
 #pragma warning( push )
 #pragma warning( disable : 4616)
-	float one = 1.0f;
-	float zero = 0.0f;
-	using TupleType = std::tuple<std::string, std::string, std::string, float>;
-	const std::vector<TupleType> tests = {
-		TupleType{ "3.14\n", "%.2f\n", "{:.2f}\n", 3.145f },
-		TupleType{ "3.15\n", "%.2f\n", "{:.2f}\n", 3.146f },
-		TupleType{ "0.100000\n", "%f\n", "{}\n", 0.1f },
-		TupleType{ "1.000000\n", "%f\n", "{}\n", 1.000000f },
-		TupleType{ "inf\n", "%f\n", "{:f}\n", one / zero },
-		TupleType{ "INF\n", "%F\n", "{:F}\n", one / zero },
-		TupleType{ "-inf\n", "%f\n", "{:f}\n", -one / zero },
-		TupleType{ "-INF\n", "%F\n", "{:F}\n", -one / zero },
-		TupleType{ "2.1200\n", "%6.4f\n", "{0:6.4f}\n", 2.12f },
-		TupleType{ "  2.1200\n", "%8.4f\n", "{ :8.4f}\n", 2.12f },
-		TupleType{ "-0.066017\n", "%f\n", "{}\n", -0.066017486155033112f}
-	};
+		float one = 1.0f;
+		float zero = 0.0f;
+		using TupleType = std::tuple<std::string, std::string, std::string, float>;
+		const std::vector<TupleType> tests = {
+			TupleType{ "3.14\n", "%.2f\n", "{:.2f}\n", 3.145f },
+			TupleType{ "3.15\n", "%.2f\n", "{:.2f}\n", 3.146f },
+			TupleType{ "0.100000\n", "%f\n", "{}\n", 0.1f },
+			TupleType{ "1.000000\n", "%f\n", "{}\n", 1.000000f },
+			TupleType{ "inf\n", "%f\n", "{:f}\n", one / zero },
+			TupleType{ "INF\n", "%F\n", "{:F}\n", one / zero },
+			TupleType{ "-inf\n", "%f\n", "{:f}\n", -one / zero },
+			TupleType{ "-INF\n", "%F\n", "{:F}\n", -one / zero },
+			TupleType{ "2.1200\n", "%6.4f\n", "{0:6.4f}\n", 2.12f },
+			TupleType{ "  2.1200\n", "%8.4f\n", "{ :8.4f}\n", 2.12f },
+			TupleType{ "-0.066017\n", "%f\n", "{}\n", -0.066017486155033112f}
+		};
 
-	for (size_t i = 0; i < tests.size(); i++)
-	{
-		auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-		printf(cFormatStr.c_str(), number);
-		IO::printf(myFormatStr.c_str(), number);
+		for (size_t i = 0; i < tests.size(); i++)
+		{
+			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+			printf(cFormatStr.c_str(), number);
+			IO::printf(myFormatStr.c_str(), number);
 
-		const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+			if (res)
+			{
+				return res;
+			}
+		}
+
+		// Test NAN separately since it does weird stuff
+		float a = 0.0f;
+		float b = 0.0f;
+		IO::printf("{:F}\n", a / b);
+		const char* res = compareMemoryPrintfOnly((const uint8_t*)"NAN\n", sizeof("NAN\n") - 1);
 		if (res)
 		{
 			return res;
 		}
-	}
 
-	// Test NAN separately since it does weird stuff
-	float a = 0.0f;
-	float b = 0.0f;
-	IO::printf("{:F}\n", a / b);
-	const char* res = compareMemoryPrintfOnly((const uint8_t*)"NAN\n", sizeof("NAN\n") - 1);
-	if (res)
-	{
-		return res;
-	}
-
-	// Test exponential degradation (printf doesn't support this, but we do)
-	// The number should degrade to exponential format if it doesn't fit in the precision
-	IO::printf("{}\n", 1.17E-41f);
-	res = compareMemoryPrintfOnly((const uint8_t*)"1.169944e-41\n", sizeof("1.169944e-41\n") - 1);
-	if (res)
-	{
-		return res;
-	}
+		// Test exponential degradation (printf doesn't support this, but we do)
+		// The number should degrade to exponential format if it doesn't fit in the precision
+		IO::printf("{}\n", 1.17E-41f);
+		res = compareMemoryPrintfOnly((const uint8_t*)"1.169944e-41\n", sizeof("1.169944e-41\n") - 1);
+		if (res)
+		{
+			return res;
+		}
 
 #pragma warning( pop )
 
-	END_TEST;
-}
-
-DEFINE_TEST(exponentialFloatOutputIsSameAsPrintf)
-{
-	ASSERT_TRUE(false);
-	END_TEST;
-}
-
-DEFINE_TEST(binaryOutputIsCorrect)
-{
-	using TupleType = std::tuple<std::string, std::string, uint32_t>;
-	const std::vector<TupleType> tests = {
-		TupleType{ "0000'0111\n", "{:b}\n", 7 },
-		TupleType{ "0000'1000'0000'0111\n", "{:<19b}\n", 2055 },
-		TupleType{ "0b0000'0111\n", "{:<#b}\n", 7 },
-		TupleType{ "0b0000'1000'0000'0111\n", "{:<#b}\n", 2055 },
-		TupleType{ "0B0000'0111\n", "{:<#B}\n", 7 },
-		TupleType{ "0B0000'1000'0000'0111\n", "{:<#B}\n", 2055 },
-	};
-
-	for (size_t i = 0; i < tests.size(); i++)
-	{
-		auto [expectedOutput, myFormatStr, number] = tests[i];
-		IO::printf(myFormatStr.c_str(), number);
-
-		const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-		if (res)
-		{
-			return res;
-		}
+		END_TEST;
 	}
 
-	END_TEST;
-}
-
-DEFINE_TEST(leftAlignIsCorrect)
-{
-	// Test left-alignment for strings
+	DEFINE_TEST(exponentialFloatOutputIsSameAsPrintf)
 	{
-		using TupleType = std::tuple<std::string, std::string, std::string, const char*>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "Hello World!    \n", "%-16s\n", "{:<16}\n", "Hello World!" },
-			TupleType{ "Hello World!\n", "%-8s\n", "{:<8}\n", "Hello World!" },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
+		ASSERT_TRUE(false);
+		END_TEST;
 	}
 
-	// Test left-alignment for hex ints (and 0-padded hex ints)
-	{
-		using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "0XABCD  \n", "%#-8X\n", "{:<#8X}\n", 0xABCD },
-			TupleType{ "0XABCD\n", "%#-3X\n", "{:<#3X}\n", 0xABCD },
-			TupleType{ "0X00ABCD\n", "%#08X\n", "{:<#08X}\n", 0xABCD },
-			TupleType{ "ABCD    \n", "%-8X\n", "{:<8X}\n", 0xABCD },
-			TupleType{ "ABCD\n", "%-3X\n", "{:<3X}\n", 0xABCD },
-			TupleType{ "0000ABCD\n", "%08X\n", "{:<08X}\n", 0xABCD },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-
-	// Test left-alignment for floats
-	{
-		using TupleType = std::tuple<std::string, std::string, std::string, float>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "1.123  \n", "%-7.3f\n", "{:<7.3f}\n", 1.123f },
-			TupleType{ "1.123\n", "%-2.3f\n", "{:<2.3f}\n", 1.123f },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-
-	// Test left-alignment for binary
+	DEFINE_TEST(binaryOutputIsCorrect)
 	{
 		using TupleType = std::tuple<std::string, std::string, uint32_t>;
 		const std::vector<TupleType> tests = {
-			TupleType{ "0000'0111          \n", "{:<19b}\n", 7 },
+			TupleType{ "0000'0111\n", "{:b}\n", 7 },
 			TupleType{ "0000'1000'0000'0111\n", "{:<19b}\n", 2055 },
-			TupleType{ "0b0000'0111          \n", "{:<#21b}\n", 7 },
-			TupleType{ "0b0000'1000'0000'0111\n", "{:<#21b}\n", 2055 },
+			TupleType{ "0b0000'0111\n", "{:<#b}\n", 7 },
+			TupleType{ "0b0000'1000'0000'0111\n", "{:<#b}\n", 2055 },
+			TupleType{ "0B0000'0111\n", "{:<#B}\n", 7 },
+			TupleType{ "0B0000'1000'0000'0111\n", "{:<#B}\n", 2055 },
 		};
 
 		for (size_t i = 0; i < tests.size(); i++)
@@ -451,97 +354,430 @@ DEFINE_TEST(leftAlignIsCorrect)
 				return res;
 			}
 		}
+
+		END_TEST;
 	}
 
-	END_TEST;
-}
-
-DEFINE_TEST(rightAlignIsCorrect)
-{
-	// Test right-alignment for strings
+	DEFINE_TEST(leftAlignIsCorrect)
 	{
-		using TupleType = std::tuple<std::string, std::string, std::string, const char*>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "    Hello World!\n", "%16s\n", "{:>16}\n", "Hello World!" },
-			TupleType{ "Hello World!\n", "%8s\n", "{:>8}\n", "Hello World!" },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
+		// Test left-alignment for strings
 		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
+			using TupleType = std::tuple<std::string, std::string, std::string, const char*>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "Hello World!    \n", "%-16s\n", "{:<16}\n", "Hello World!" },
+				TupleType{ "Hello World!\n", "%-8s\n", "{:<8}\n", "Hello World!" },
+			};
 
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
+			for (size_t i = 0; i < tests.size(); i++)
 			{
-				return res;
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
 			}
 		}
-	}
 
-	// Test right-alignment for hex ints (and 0-padded hex ints)
-	{
-		using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "  0XABCD\n", "%#8X\n", "{:>#8X}\n", 0xABCD },
-			TupleType{ "0XABCD\n", "%#3X\n", "{:>#3X}\n", 0xABCD },
-			TupleType{ "0X00ABCD\n", "%#08X\n", "{:>#08X}\n", 0xABCD },
-			TupleType{ "    ABCD\n", "%8X\n", "{:>8X}\n", 0xABCD },
-			TupleType{ "ABCD\n", "%3X\n", "{:>3X}\n", 0xABCD },
-			TupleType{ "0000ABCD\n", "%08X\n", "{:>08X}\n", 0xABCD },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
+		// Test left-alignment for hex ints (and 0-padded hex ints)
 		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
+			using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "0XABCD  \n", "%#-8X\n", "{:<#8X}\n", 0xABCD },
+				TupleType{ "0XABCD\n", "%#-3X\n", "{:<#3X}\n", 0xABCD },
+				TupleType{ "0X00ABCD\n", "%#08X\n", "{:<#08X}\n", 0xABCD },
+				TupleType{ "ABCD    \n", "%-8X\n", "{:<8X}\n", 0xABCD },
+				TupleType{ "ABCD\n", "%-3X\n", "{:<3X}\n", 0xABCD },
+				TupleType{ "0000ABCD\n", "%08X\n", "{:<08X}\n", 0xABCD },
+			};
 
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
+			for (size_t i = 0; i < tests.size(); i++)
 			{
-				return res;
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
 			}
 		}
-	}
 
-	// Test right-alignment for floats
-	{
-		using TupleType = std::tuple<std::string, std::string, std::string, float>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "  1.123\n", "%7.3f\n", "{:>7.3f}\n", 1.123f },
-			TupleType{ "1.123\n", "%2.3f\n", "{:>2.3f}\n", 1.123f },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
+		// Test left-alignment for floats
 		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
+			using TupleType = std::tuple<std::string, std::string, std::string, float>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "1.123  \n", "%-7.3f\n", "{:<7.3f}\n", 1.123f },
+				TupleType{ "1.123\n", "%-2.3f\n", "{:<2.3f}\n", 1.123f },
+			};
 
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
+			for (size_t i = 0; i < tests.size(); i++)
 			{
-				return res;
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
 			}
 		}
+
+		// Test left-alignment for binary
+		{
+			using TupleType = std::tuple<std::string, std::string, uint32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "0000'0111          \n", "{:<19b}\n", 7 },
+				TupleType{ "0000'1000'0000'0111\n", "{:<19b}\n", 2055 },
+				TupleType{ "0b0000'0111          \n", "{:<#21b}\n", 7 },
+				TupleType{ "0b0000'1000'0000'0111\n", "{:<#21b}\n", 2055 },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, myFormatStr, number] = tests[i];
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		END_TEST;
 	}
 
-	// Test right-alignment for binary
+	DEFINE_TEST(rightAlignIsCorrect)
 	{
-		using TupleType = std::tuple<std::string, std::string, uint32_t>;
+		// Test right-alignment for strings
+		{
+			using TupleType = std::tuple<std::string, std::string, std::string, const char*>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "    Hello World!\n", "%16s\n", "{:>16}\n", "Hello World!" },
+				TupleType{ "Hello World!\n", "%8s\n", "{:>8}\n", "Hello World!" },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Test right-alignment for hex ints (and 0-padded hex ints)
+		{
+			using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "  0XABCD\n", "%#8X\n", "{:>#8X}\n", 0xABCD },
+				TupleType{ "0XABCD\n", "%#3X\n", "{:>#3X}\n", 0xABCD },
+				TupleType{ "0X00ABCD\n", "%#08X\n", "{:>#08X}\n", 0xABCD },
+				TupleType{ "    ABCD\n", "%8X\n", "{:>8X}\n", 0xABCD },
+				TupleType{ "ABCD\n", "%3X\n", "{:>3X}\n", 0xABCD },
+				TupleType{ "0000ABCD\n", "%08X\n", "{:>08X}\n", 0xABCD },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Test right-alignment for floats
+		{
+			using TupleType = std::tuple<std::string, std::string, std::string, float>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "  1.123\n", "%7.3f\n", "{:>7.3f}\n", 1.123f },
+				TupleType{ "1.123\n", "%2.3f\n", "{:>2.3f}\n", 1.123f },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Test right-alignment for binary
+		{
+			using TupleType = std::tuple<std::string, std::string, uint32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "          0000'0111\n", "{:>19b}\n", 7 },
+				TupleType{ "0000'1000'0000'0111\n", "{:>19b}\n", 2055 },
+				TupleType{ "          0b0000'0111\n", "{:>#21b}\n", 7 },
+				TupleType{ "0b0000'1000'0000'0111\n", "{:>#21b}\n", 2055 },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, myFormatStr, number] = tests[i];
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(centerAlignIsCorrect)
+	{
+		// Test center-alignment for strings
+		{
+			using TupleType = std::tuple<std::string, std::string, const char*>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "  Hello World!  \n", "{:^16}\n", "Hello World!" },
+				TupleType{ "Hello World!\n", "{:^8}\n", "Hello World!" },
+				TupleType{ "   Hello World!  \n", "{:^17}\n", "Hello World!" },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, myFormatStr, number] = tests[i];
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Test center-alignment for hex ints (and 0-padded hex ints)
+		{
+			using TupleType = std::tuple<std::string, std::string, uint32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ " 0XABCD \n", "{:^#8X}\n", 0xABCD },
+				TupleType{ "  0XABCD \n", "{:^#9X}\n", 0xABCD },
+				TupleType{ "0XABCD\n", "{:^#3X}\n", 0xABCD },
+				TupleType{ "0X00ABCD\n", "{:^#08X}\n", 0xABCD },
+				TupleType{ "  ABCD  \n", "{:^8X}\n", 0xABCD },
+				TupleType{ "   ABCD  \n", "{:^9X}\n", 0xABCD },
+				TupleType{ "ABCD\n", "{:^3X}\n", 0xABCD },
+				TupleType{ "0000ABCD\n", "{:^08X}\n", 0xABCD },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, myFormatStr, number] = tests[i];
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Test center-alignment for floats
+		{
+			using TupleType = std::tuple<std::string, std::string, float>;
+			const std::vector<TupleType> tests = {
+				TupleType{ " 1.123 \n", "{:^7.3f}\n", 1.123f },
+				TupleType{ "  1.123 \n", "{:^8.3f}\n", 1.123f },
+				TupleType{ "1.123\n", "{:^2.3f}\n", 1.123f },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, myFormatStr, number] = tests[i];
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Test center-alignment for binary
+		{
+			using TupleType = std::tuple<std::string, std::string, uint32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "     0000'0111     \n", "{:^19b}\n", 7 },
+				TupleType{ "      0000'0111     \n", "{:^20b}\n", 7 },
+				TupleType{ "0000'1000'0000'0111\n", "{:^19b}\n", 2055 },
+				TupleType{ "     0b0000'0111     \n", "{:^#21b}\n", 7 },
+				TupleType{ "      0b0000'0111     \n", "{:^#22b}\n", 7 },
+				TupleType{ "0b0000'1000'0000'0111\n", "{:^#21b}\n", 2055 },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, myFormatStr, number] = tests[i];
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(signedOutputIsSameAsPrintf)
+	{
+		// Signed output shouldn't effect hex ints
+		{
+			using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "  0XABCD\n", "%+#8X\n", "{:>+#8X}\n", 0xABCD },
+				TupleType{ "ABCD\n", "%+3X\n", "{:>+3X}\n", 0xABCD },
+				TupleType{ "0X00ABCD\n", "%+#08X\n", "{:>+#08X}\n", 0xABCD },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Signed/spaced output test for floats
+		{
+			using TupleType = std::tuple<std::string, std::string, std::string, float>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "+1.123\n", "%+.3f\n", "{:+.3f}\n", 1.123f },
+				TupleType{ "-1.123\n", "%+.3f\n", "{:+.3f}\n", -1.123f },
+				TupleType{ " 1.123\n", "% .3f\n", "{: .3f}\n", 1.123f },
+				TupleType{ "-1.123\n", "% .3f\n", "{: .3f}\n", -1.123f },
+				TupleType{ "1.123\n", "%.3f\n", "{:-.3f}\n", 1.123f },
+				TupleType{ "-1.123\n", "%.3f\n", "{:-.3f}\n", -1.123f },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Signed/spaced output should do nothing for binary
+		{
+			using TupleType = std::tuple<std::string, std::string, uint32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "          0000'0111\n", "{:>+19b}\n", 7 },
+				TupleType{ "0000'1000'0000'0111\n", "{:>+19b}\n", 2055 },
+				TupleType{ "          0b0000'0111\n", "{:>-#21b}\n", 7 },
+				TupleType{ "0b0000'1000'0000'0111\n", "{:>-#21b}\n", 2055 },
+				TupleType{ "          0b0000'0111\n", "{:> #21b}\n", 7 },
+				TupleType{ "0b0000'1000'0000'0111\n", "{:> #21b}\n", 2055 }
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, myFormatStr, number] = tests[i];
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+
+		// Signed/spaced output test for decimal integers
+		{
+			using TupleType = std::tuple<std::string, std::string, std::string, int32_t>;
+			const std::vector<TupleType> tests = {
+				TupleType{ "+7\n", "%+d\n", "{:+d}\n", 7 },
+				TupleType{ "-7\n", "%+d\n", "{:+d}\n", -7 },
+				TupleType{ " 232\n", "% d\n", "{: d}\n", 232 },
+				TupleType{ "-232\n", "% d\n", "{: d}\n", -232 },
+				TupleType{ "1299\n", "%d\n", "{:-d}\n", 1299 },
+				TupleType{ "-1299\n", "%d\n", "{:-d}\n", -1299 },
+			};
+
+			for (size_t i = 0; i < tests.size(); i++)
+			{
+				auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
+				printf(cFormatStr.c_str(), number);
+				IO::printf(myFormatStr.c_str(), number);
+
+				const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
+				if (res)
+				{
+					return res;
+				}
+			}
+		}
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8FillCharacterFillsProperly)
+	{
+		// Different sized UTF8 characters shouldn't effect the fill count
+		using TupleType = std::tuple<std::string, std::string, std::string>;
 		const std::vector<TupleType> tests = {
-			TupleType{ "          0000'0111\n", "{:>19b}\n", 7 },
-			TupleType{ "0000'1000'0000'0111\n", "{:>19b}\n", 2055 },
-			TupleType{ "          0b0000'0111\n", "{:>#21b}\n", 7 },
-			TupleType{ "0b0000'1000'0000'0111\n", "{:>#21b}\n", 2055 },
+			// 1-byte UTF8 codepoint
+			TupleType{ "$$Hi!$$\n", "{$:^7}\n", "Hi!"},
+			// 2-byte UTF8 codepoint
+			TupleType{ u8"\u00A7\u00A7Hi!\u00A7\u00A7\n", u8"{\u00A7:^7}\n", "Hi!"},
+			// 3-byte UTF8 codepoint
+			TupleType{ u8"\u09A8\u09A8Hi!\u09A8\u09A8\n", u8"{\u09A8:^7}\n", "Hi!"},
+			// 4-byte UTF8 codepoint
+			TupleType{ u8"\U0001D122\U0001D122Hi!\U0001D122\U0001D122\n", u8"{\U0001D122:^7}\n", "Hi!"},
 		};
 
 		for (size_t i = 0; i < tests.size(); i++)
 		{
-			auto [expectedOutput, myFormatStr, number] = tests[i];
-			IO::printf(myFormatStr.c_str(), number);
+			auto [expectedOutput, myFormatStr, str] = tests[i];
+			IO::printf(myFormatStr.c_str(), str);
 
 			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
 			if (res)
@@ -549,263 +785,27 @@ DEFINE_TEST(rightAlignIsCorrect)
 				return res;
 			}
 		}
+
+		END_TEST;
 	}
 
-	END_TEST;
-}
-
-DEFINE_TEST(centerAlignIsCorrect)
-{
-	// Test center-alignment for strings
+	void setupPrintTestSuite()
 	{
-		using TupleType = std::tuple<std::string, std::string, const char*>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "  Hello World!  \n", "{:^16}\n", "Hello World!" },
-			TupleType{ "Hello World!\n", "{:^8}\n", "Hello World!" },
-			TupleType{ "   Hello World!  \n", "{:^17}\n", "Hello World!" },
-		};
+		Tests::TestSuite& testSuite = Tests::addTestSuite("cppPrint.hpp");
 
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, myFormatStr, number] = tests[i];
-			IO::printf(myFormatStr.c_str(), number);
+		ADD_BEFORE_EACH(testSuite, setupTest);
+		ADD_AFTER_EACH(testSuite, teardownTest);
 
-			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
+		ADD_TEST(testSuite, hexOutputIsSameAsPrintf);
+		ADD_TEST(testSuite, floatOutputIsSameAsPrintf);
+		ADD_TEST(testSuite, exponentialFloatOutputIsSameAsPrintf);
+		ADD_TEST(testSuite, binaryOutputIsCorrect);
+		ADD_TEST(testSuite, leftAlignIsCorrect);
+		ADD_TEST(testSuite, rightAlignIsCorrect);
+		ADD_TEST(testSuite, centerAlignIsCorrect);
+		ADD_TEST(testSuite, signedOutputIsSameAsPrintf);
+		ADD_TEST(testSuite, utf8FillCharacterFillsProperly);
 	}
-
-	// Test center-alignment for hex ints (and 0-padded hex ints)
-	{
-		using TupleType = std::tuple<std::string, std::string, uint32_t>;
-		const std::vector<TupleType> tests = {
-			TupleType{ " 0XABCD \n", "{:^#8X}\n", 0xABCD },
-			TupleType{ "  0XABCD \n", "{:^#9X}\n", 0xABCD },
-			TupleType{ "0XABCD\n", "{:^#3X}\n", 0xABCD },
-			TupleType{ "0X00ABCD\n", "{:^#08X}\n", 0xABCD },
-			TupleType{ "  ABCD  \n", "{:^8X}\n", 0xABCD },
-			TupleType{ "   ABCD  \n", "{:^9X}\n", 0xABCD },
-			TupleType{ "ABCD\n", "{:^3X}\n", 0xABCD },
-			TupleType{ "0000ABCD\n", "{:^08X}\n", 0xABCD },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, myFormatStr, number] = tests[i];
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-
-	// Test center-alignment for floats
-	{
-		using TupleType = std::tuple<std::string, std::string, float>;
-		const std::vector<TupleType> tests = {
-			TupleType{ " 1.123 \n", "{:^7.3f}\n", 1.123f },
-			TupleType{ "  1.123 \n", "{:^8.3f}\n", 1.123f },
-			TupleType{ "1.123\n", "{:^2.3f}\n", 1.123f },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, myFormatStr, number] = tests[i];
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-
-	// Test center-alignment for binary
-	{
-		using TupleType = std::tuple<std::string, std::string, uint32_t>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "     0000'0111     \n", "{:^19b}\n", 7 },
-			TupleType{ "      0000'0111     \n", "{:^20b}\n", 7 },
-			TupleType{ "0000'1000'0000'0111\n", "{:^19b}\n", 2055 },
-			TupleType{ "     0b0000'0111     \n", "{:^#21b}\n", 7 },
-			TupleType{ "      0b0000'0111     \n", "{:^#22b}\n", 7 },
-			TupleType{ "0b0000'1000'0000'0111\n", "{:^#21b}\n", 2055 },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, myFormatStr, number] = tests[i];
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-
-	END_TEST;
-}
-
-DEFINE_TEST(signedOutputIsSameAsPrintf)
-{
-	// Signed output shouldn't effect hex ints
-	{
-		using TupleType = std::tuple<std::string, std::string, std::string, uint32_t>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "  0XABCD\n", "%+#8X\n", "{:>+#8X}\n", 0xABCD },
-			TupleType{ "ABCD\n", "%+3X\n", "{:>+3X}\n", 0xABCD },
-			TupleType{ "0X00ABCD\n", "%+#08X\n", "{:>+#08X}\n", 0xABCD },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-
-	// Signed/spaced output test for floats
-	{
-		using TupleType = std::tuple<std::string, std::string, std::string, float>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "+1.123\n", "%+.3f\n", "{:+.3f}\n", 1.123f },
-			TupleType{ "-1.123\n", "%+.3f\n", "{:+.3f}\n", -1.123f },
-			TupleType{ " 1.123\n", "% .3f\n", "{: .3f}\n", 1.123f },
-			TupleType{ "-1.123\n", "% .3f\n", "{: .3f}\n", -1.123f },
-			TupleType{ "1.123\n", "%.3f\n", "{:-.3f}\n", 1.123f },
-			TupleType{ "-1.123\n", "%.3f\n", "{:-.3f}\n", -1.123f },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-
-	// Signed/spaced output should do nothing for binary
-	{
-		using TupleType = std::tuple<std::string, std::string, uint32_t>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "          0000'0111\n", "{:>+19b}\n", 7 },
-			TupleType{ "0000'1000'0000'0111\n", "{:>+19b}\n", 2055 },
-			TupleType{ "          0b0000'0111\n", "{:>-#21b}\n", 7 },
-			TupleType{ "0b0000'1000'0000'0111\n", "{:>-#21b}\n", 2055 },
-			TupleType{ "          0b0000'0111\n", "{:> #21b}\n", 7 },
-			TupleType{ "0b0000'1000'0000'0111\n", "{:> #21b}\n", 2055 }
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, myFormatStr, number] = tests[i];
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-
-	// Signed/spaced output test for decimal integers
-	{
-		using TupleType = std::tuple<std::string, std::string, std::string, int32_t>;
-		const std::vector<TupleType> tests = {
-			TupleType{ "+7\n", "%+d\n", "{:+d}\n", 7 },
-			TupleType{ "-7\n", "%+d\n", "{:+d}\n", -7 },
-			TupleType{ " 232\n", "% d\n", "{: d}\n", 232 },
-			TupleType{ "-232\n", "% d\n", "{: d}\n", -232 },
-			TupleType{ "1299\n", "%d\n", "{:-d}\n", 1299 },
-			TupleType{ "-1299\n", "%d\n", "{:-d}\n", -1299 },
-		};
-
-		for (size_t i = 0; i < tests.size(); i++)
-		{
-			auto [expectedOutput, cFormatStr, myFormatStr, number] = tests[i];
-			printf(cFormatStr.c_str(), number);
-			IO::printf(myFormatStr.c_str(), number);
-
-			const char* res = compareMemory((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-			if (res)
-			{
-				return res;
-			}
-		}
-	}
-	END_TEST;
-}
-
-DEFINE_TEST(utf8FillCharacterFillsProperly)
-{
-	// Different sized UTF8 characters shouldn't effect the fill count
-	using TupleType = std::tuple<std::string, std::string, std::string>;
-	const std::vector<TupleType> tests = {
-		// 1-byte UTF8 codepoint
-		TupleType{ "$$Hi!$$\n", "{$:^7}\n", "Hi!"},
-		// 2-byte UTF8 codepoint
-		TupleType{ u8"\u00A7\u00A7Hi!\u00A7\u00A7\n", u8"{\u00A7:^7}\n", "Hi!"},
-		// 3-byte UTF8 codepoint
-		TupleType{ u8"\u09A8\u09A8Hi!\u09A8\u09A8\n", u8"{\u09A8:^7}\n", "Hi!"},
-		// 4-byte UTF8 codepoint
-		TupleType{ u8"\U0001D122\U0001D122Hi!\U0001D122\U0001D122\n", u8"{\U0001D122:^7}\n", "Hi!"},
-	};
-
-	for (size_t i = 0; i < tests.size(); i++)
-	{
-		auto [expectedOutput, myFormatStr, str] = tests[i];
-		IO::printf(myFormatStr.c_str(), str);
-
-		const char* res = compareMemoryPrintfOnly((const uint8_t*)expectedOutput.c_str(), expectedOutput.length());
-		if (res)
-		{
-			return res;
-		}
-	}
-
-	END_TEST;
-}
-
-void setupPrintTestSuite()
-{
-	Tests::TestSuite& testSuite = Tests::addTestSuite("cppPrint.hpp");
-
-	ADD_BEFORE_EACH(testSuite, setupTest);
-	ADD_AFTER_EACH(testSuite, teardownTest);
-
-	ADD_TEST(testSuite, hexOutputIsSameAsPrintf);
-	ADD_TEST(testSuite, floatOutputIsSameAsPrintf);
-	ADD_TEST(testSuite, exponentialFloatOutputIsSameAsPrintf);
-	ADD_TEST(testSuite, binaryOutputIsCorrect);
-	ADD_TEST(testSuite, leftAlignIsCorrect);
-	ADD_TEST(testSuite, rightAlignIsCorrect);
-	ADD_TEST(testSuite, centerAlignIsCorrect);
-	ADD_TEST(testSuite, signedOutputIsSameAsPrintf);
-	ADD_TEST(testSuite, utf8FillCharacterFillsProperly);
-}
 
 }
 
@@ -813,18 +813,18 @@ void setupPrintTestSuite()
 namespace ThreadPoolTestSuite
 {
 
-DEFINE_TEST(dummy)
-{
-	ASSERT_TRUE(false);
-	END_TEST;
-}
+	DEFINE_TEST(dummy)
+	{
+		ASSERT_TRUE(false);
+		END_TEST;
+	}
 
-void setupThreadPoolTestSuite()
-{
-	Tests::TestSuite& testSuite = Tests::addTestSuite("cppThreadPool.hpp");
+	void setupThreadPoolTestSuite()
+	{
+		Tests::TestSuite& testSuite = Tests::addTestSuite("cppThreadPool.hpp");
 
-	ADD_TEST(testSuite, dummy);
-}
+		ADD_TEST(testSuite, dummy);
+	}
 
 }
 
@@ -832,57 +832,57 @@ void setupThreadPoolTestSuite()
 namespace CppUtilsTestSuite
 {
 
-DEFINE_BEFORE_EACH(beforeEach)
-{
-	g_logger_info("Before each.");
-	END_BEFORE_EACH;
-}
+	DEFINE_BEFORE_EACH(beforeEach)
+	{
+		g_logger_info("Before each.");
+		END_BEFORE_EACH;
+	}
 
-DEFINE_AFTER_EACH(afterEach)
-{
-	g_logger_info("After each.");
-	END_AFTER_EACH;
-}
+	DEFINE_AFTER_EACH(afterEach)
+	{
+		g_logger_info("After each.");
+		END_AFTER_EACH;
+	}
 
-DEFINE_BEFORE_ALL(beforeAll)
-{
-	g_logger_info("Before all");
-	END_BEFORE_ALL;
-}
+	DEFINE_BEFORE_ALL(beforeAll)
+	{
+		g_logger_info("Before all");
+		END_BEFORE_ALL;
+	}
 
-DEFINE_AFTER_ALL(afterAll)
-{
-	g_logger_info("After all");
-	END_BEFORE_ALL;
-}
+	DEFINE_AFTER_ALL(afterAll)
+	{
+		g_logger_info("After all");
+		END_BEFORE_ALL;
+	}
 
-DEFINE_TEST(dummy)
-{
-	g_logger_info("Dummy 1");
-	ASSERT_TRUE(false);
-	END_TEST;
-}
+	DEFINE_TEST(dummy)
+	{
+		g_logger_info("Dummy 1");
+		ASSERT_TRUE(false);
+		END_TEST;
+	}
 
-DEFINE_TEST(dummy2)
-{
-	g_logger_info("Dummy 2");
-	ASSERT_TRUE(true);
-	END_TEST;
-}
+	DEFINE_TEST(dummy2)
+	{
+		g_logger_info("Dummy 2");
+		ASSERT_TRUE(true);
+		END_TEST;
+	}
 
-void setupCppUtilsTestSuite()
-{
-	Tests::TestSuite& testSuite = Tests::addTestSuite("cppUtils.hpp");
+	void setupCppUtilsTestSuite()
+	{
+		Tests::TestSuite& testSuite = Tests::addTestSuite("cppUtils.hpp");
 
-	ADD_BEFORE_EACH(testSuite, beforeEach);
-	ADD_AFTER_EACH(testSuite, afterEach);
+		ADD_BEFORE_EACH(testSuite, beforeEach);
+		ADD_AFTER_EACH(testSuite, afterEach);
 
-	ADD_BEFORE_ALL(testSuite, beforeAll);
-	ADD_AFTER_ALL(testSuite, afterAll);
+		ADD_BEFORE_ALL(testSuite, beforeAll);
+		ADD_AFTER_ALL(testSuite, afterAll);
 
-	ADD_TEST(testSuite, dummy);
-	ADD_TEST(testSuite, dummy2);
-}
+		ADD_TEST(testSuite, dummy);
+		ADD_TEST(testSuite, dummy2);
+	}
 
 }
 
@@ -900,22 +900,26 @@ void mainFunc()
 {
 	g_logger_init();
 	g_logger_set_level(g_logger_level_All);
-	g_logger_set_log_directory("C:/dev/C++/CppUtils/logs");
-	g_memory_init_padding(true, 1024);
+	g_logger_set_log_directory("./logs");
+	g_memory_init_padding_zeroed(true, 1024, true);
 
-	setupCppStringsTestSuite();
-	setupMaybeTestSuite();
-	setupPrintTestSuite();
-	setupThreadPoolTestSuite();
-	setupCppUtilsTestSuite();
+	constexpr bool runTests = true;
+	if (runTests)
+	{
+		setupCppStringsTestSuite();
+		setupMaybeTestSuite();
+		setupPrintTestSuite();
+		setupThreadPoolTestSuite();
+		setupCppUtilsTestSuite();
 
-	Tests::runTests();
-	Tests::free();
+		Tests::runTests();
+		Tests::free();
+	}
 
 	IO::setBackgroundColor(ConsoleColor::BLACK);
 
 	constexpr bool testingCppUtils = false;
-	constexpr bool testingCppPrint = true;
+	constexpr bool testingCppPrint = false;
 
 	if (testingCppUtils)
 	{
@@ -950,7 +954,7 @@ void mainFunc()
 		g_memory_free(memoryCorruptionBufferUnderrun);
 
 		uint8* memoryCorruptionBufferOverrun = (uint8*)g_memory_allocate(sizeof(uint8) * 312);
-		memoryCorruptionBufferOverrun[312 + 809] = 'a';
+		memoryCorruptionBufferOverrun[312 + 809] = 'e';
 		memoryCorruptionBufferOverrun = (uint8*)g_memory_realloc(memoryCorruptionBufferOverrun, sizeof(uint8) * 543);
 		g_memory_free(memoryCorruptionBufferOverrun);
 
@@ -1064,35 +1068,35 @@ void mainFunc()
 			u8"special-quotes: \u201C\u201D\u201E\u201F\u2018\u2019\u201A\u201B \n"
 			u8"        arrows: \u2192 \u2190 \u2191 \u2193 \u2194 \u2195 \n"
 			u8"        emojis: \U0001F600 \U0001F680 \U0001F4A9");
-	}
 
-	// Trying all the colors
-	for (int i = (int)ConsoleColor::BLACK; i < (int)ConsoleColor::WHITE; i++)
-	{
-		if (i <= (int)ConsoleColor::DARKGRAY)
+		// Trying all the colors
+		for (int i = (int)ConsoleColor::BLACK; i < (int)ConsoleColor::WHITE; i++)
 		{
+			if (i <= (int)ConsoleColor::DARKGRAY)
+			{
+				IO::printf("{:>2}: ", i);
+				IO::setColor((ConsoleColor)i, (ConsoleColor)(i + 8));
+				IO::printf("I am the color {}", (ConsoleColor)i);
+				IO::resetColor();
+				IO::printf("\n");
+			}
+
 			IO::printf("{:>2}: ", i);
-			IO::setColor((ConsoleColor)i, (ConsoleColor)(i + 8));
+			IO::setForegroundColor((ConsoleColor)i);
 			IO::printf("I am the color {}", (ConsoleColor)i);
 			IO::resetColor();
 			IO::printf("\n");
 		}
 
-		IO::printf("{:>2}: ", i);
-		IO::setForegroundColor((ConsoleColor)i);
-		IO::printf("I am the color {}", (ConsoleColor)i);
-		IO::resetColor();
-		IO::printf("\n");
+		g_logger_info("A char: {}", (char)'a');
+		g_logger_info("An unsigned and signed long: {} {}", (unsigned long)20, (signed long)-20);
+		int aVar = 5;
+		g_logger_info(
+			"\n A pointer: {}"
+			"\nReal value: {:#018X}",
+			&aVar,
+			(uint64_t)(void*)(&aVar));
 	}
-
-	g_logger_info("A char: {}", (char)'a');
-	g_logger_info("An unsigned and signed long: {} {}", (unsigned long)20, (signed long)-20);
-	int aVar = 5;
-	g_logger_info(
-		"\n A pointer: {}"
-		"\nReal value: {:#018X}", 
-		&aVar,
-		(uint64_t)(void*)(&aVar));
 
 	g_memory_dumpMemoryLeaks();
 
