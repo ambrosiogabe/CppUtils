@@ -9,7 +9,7 @@
  #undef GABE_CPP_UTILS_IMPL
 
  NOTE: When using this with the cppPrint.hpp file, make sure to define USE_GABE_CPP_PRINT before including this file
-       anywhere like this:
+	   anywhere like this:
 
  #define USE_GABE_CPP_PRINT
  #include "cppUtils.hpp"
@@ -56,26 +56,25 @@
 						   number, like 1-2 bytes, if you plan on releasing your app with this turned on.
 g_memory_init_padding_zeroed(bool detectMemoryLeaks, uint16 bufferPadding, bool zeroMemoryOnAllocate)
   - Same as the above two functions. If zeroMemoryOnAllocate is set to true, than all memory
-    allocated will be zeroed out before being returned.
+	allocated will be zeroed out before being returned.
 
  g_memory_dumpMemoryLeaks();
  g_memory_deinit();
 
- NOTE: Only memory allocated using this function or the new operator (in C++) will be tracked
+ NOTE: Only memory allocated using this function (in C++ the functions with new) will be tracked
 	g_memory_allocate(size_t numBytes)
 	new Object(...)
-	new Object[10];
 
-	// PLACEMENT NEW NOT SUPPORTED. 
-	// Placement new won't work because of some limitations with macro magic, so the following does not work if
+	// PLACEMENT NEW NOT SUPPORTED.
+	// NEW AND DELETE ARRAYS NOT SUPPORTED.
+	// Placement new won't work because of some limitations with macro magic, so the following will not be tracked
 	// you use this library:
 	new(memory)Object();
 
  NOTE: Call this on any memory allocated with the above function (or delete in C++) to properly track it
 	g_memory_free(void* memory)
 	  - g_memory_free(NULL) is a no op. So you can safely pass NULL, or nullptr to g_memory_free.
-	delete memory;
-	delete[] memory;
+	g_memory_delete(memory);
 
  NOTE: Only call this on memory that was allocated using the above function
 	g_memory_realloc(void* memory, size_t newSize)
@@ -140,7 +139,7 @@ g_memory_init_padding_zeroed(bool detectMemoryLeaks, uint16 bufferPadding, bool 
 	new
 	new[]
 	delete
-	delete[] 
+	delete[]
 
  -------- FUNCTION DESCRIPTIONS --------
 
@@ -194,10 +193,6 @@ g_memory_init_padding_zeroed(bool detectMemoryLeaks, uint16 bufferPadding, bool 
 #include <stdbool.h>
 
 #ifdef __cplusplus
-
-void* operator new(size_t size, const char* filename, int line);
-void operator delete(void* memory, const char* filename, int line);
-
 extern "C" {
 #endif
 
@@ -213,9 +208,6 @@ extern "C" {
 	typedef uint16_t uint16;
 	typedef uint32_t uint32;
 	typedef uint64_t uint64;
-
-#define new new(__FILE__, __LINE__)
-#define delete delete(__FILE__, __LINE__)
 
 #define g_memory_allocate(numBytes) _g_memory_allocate(__FILE__, __LINE__, numBytes)
 #define g_memory_realloc(memory, newSize) _g_memory_realloc(__FILE__, __LINE__, memory, newSize)
@@ -250,16 +242,16 @@ extern "C" {
 	} g_logger_level;
 
 #ifdef _WIN32
-typedef unsigned short WORD;
+	typedef unsigned short WORD;
 
-// NOTE: These are just taken from consoleapi2.h to avoid polluting global namespace
-//       with a bunch of useless headers
-const WORD g_logger_FOREGROUND_BLUE = 0x0001; // text color contains blue.
-const WORD g_logger_FOREGROUND_GREEN = 0x0002; // text color contains green.
-const WORD g_logger_FOREGROUND_RED = 0x0004; // text color contains red.
-const WORD g_logger_BACKGROUND_BLUE = 0x0010; // background color contains blue.
-const WORD g_logger_BACKGROUND_GREEN = 0x0020; // background color contains green.
-const WORD g_logger_BACKGROUND_RED = 0x0040; // background color contains red.
+	// NOTE: These are just taken from consoleapi2.h to avoid polluting global namespace
+	//       with a bunch of useless headers
+	const WORD g_logger_FOREGROUND_BLUE = 0x0001; // text color contains blue.
+	const WORD g_logger_FOREGROUND_GREEN = 0x0002; // text color contains green.
+	const WORD g_logger_FOREGROUND_RED = 0x0004; // text color contains red.
+	const WORD g_logger_BACKGROUND_BLUE = 0x0010; // background color contains blue.
+	const WORD g_logger_BACKGROUND_GREEN = 0x0020; // background color contains green.
+	const WORD g_logger_BACKGROUND_RED = 0x0040; // background color contains red.
 #endif
 
 #define VA_ARGS(...) , ##__VA_ARGS__
@@ -361,6 +353,26 @@ GABE_CPP_UTILS_API void _g_logger_gabeAssert(const char* filename, int line, boo
 #endif // _WIN32
 #endif // USE_GABE_CPP_PRINT
 
+#ifdef __cplusplus
+
+void* operator new(size_t size, const char* filename, int line);
+void operator delete(void* memory, const char* filename, int line);
+
+template<typename T>
+void _g_memory_delete(T* memory, const char* filename, int line)
+{
+	if (memory)
+	{
+		memory->~T();
+		_g_memory_free(filename, line, memory);
+	}
+}
+
+#define g_memory_new new(__FILE__, __LINE__)
+#define g_memory_delete(memory) _g_memory_delete(memory, __FILE__, __LINE__)
+
+#endif // __cplusplus
+
 #endif // GABE_CPP_UTILS_H
 
 
@@ -382,24 +394,18 @@ GABE_CPP_UTILS_API void _g_logger_gabeAssert(const char* filename, int line, boo
 // Overriding new/delete operators
 #ifdef __cplusplus
 
-#ifdef new 
-#undef new
-#endif
-
-#ifdef delete
-#undef delete
-#endif
-
 void* operator new(size_t size, const char* filename, int line)
 {
 	void* ptr = _g_memory_allocate(filename, line, size);
 	return ptr;
 }
 
-void operator delete(void* memory, const char* filename, int line) 
+void operator delete(void* memory, const char*, int)
 {
-	_g_memory_free(filename, line, memory);
+	g_logger_error("Exception thrown in new operator.");
+	return delete memory;
 }
+
 #endif 
 
 #ifdef _WIN32
@@ -724,7 +730,7 @@ void* _g_memory_realloc(const char* filename, int line, void* oldMemory, size_t 
 void _g_memory_free(const char* filename, int line, void* memory)
 {
 	// g_memory_free(NULL) is a NOP
-	if (memory == NULL) 
+	if (memory == NULL)
 	{
 		return;
 	}

@@ -892,6 +892,28 @@ using namespace PrintTestSuite;
 using namespace ThreadPoolTestSuite;
 using namespace CppUtilsTestSuite;
 
+#include <vector>
+#include <string>
+
+struct Foo
+{
+	Foo(const std::string& str) 
+		: str(str) {}
+
+	~Foo()
+	{
+		g_logger_info("Foo destructor called");
+	}
+
+	std::string str;
+};
+
+struct ComplexStruct
+{
+	std::vector<int> blahs;
+	Foo foo = Foo("Hello");
+};
+
 // I'm purposely leaking memory and don't want to be warned to see if my
 // library catches it so we disable warnings about unreferenced vars
 #pragma warning( push )
@@ -903,7 +925,7 @@ void mainFunc()
 	g_logger_set_log_directory("./logs");
 	g_memory_init_padding_zeroed(true, 1024, true);
 
-	constexpr bool runTests = true;
+	constexpr bool runTests = false;
 	if (runTests)
 	{
 		setupCppStringsTestSuite();
@@ -918,7 +940,7 @@ void mainFunc()
 
 	IO::setBackgroundColor(ConsoleColor::BLACK);
 
-	constexpr bool testingCppUtils = false;
+	constexpr bool testingCppUtils = true;
 	constexpr bool testingCppPrint = false;
 
 	if (testingCppUtils)
@@ -967,6 +989,18 @@ void mainFunc()
 		doubleReallocShouldSucceed = (uint8*)g_memory_realloc(doubleReallocShouldSucceed, sizeof(uint8) * 5048);
 		doubleReallocShouldSucceed = (uint8*)g_memory_realloc(doubleReallocShouldSucceed, sizeof(uint8) * 5048 * 2);
 		g_memory_free(doubleReallocShouldSucceed);
+
+		// Test new and delete operators
+		ComplexStruct* newMemoryLeak = g_memory_new ComplexStruct();
+		g_logger_info("Foo name: '{}'", newMemoryLeak->foo.str);
+
+		ComplexStruct* newShouldBeFine = g_memory_new ComplexStruct();
+		g_memory_delete(newShouldBeFine);
+
+		ComplexStruct* nullFooShouldBeFine = nullptr;
+		g_memory_delete(nullFooShouldBeFine);
+
+		g_memory_free(nullptr);
 	}
 
 	if (testingCppPrint)
