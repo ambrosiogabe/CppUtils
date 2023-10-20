@@ -418,9 +418,15 @@ static Maybe<uint32_t, Utf8ErrorCode> decodeChar(const uint8_t* rawString, size_
 
 	uint32_t res = 0;
 	uint8_t lowOctetBitmask = 0b0011'1111;
-	uint8_t maskedByte1 = rawString[(cursor + 1) % numOctets] & lowOctetBitmask;
-	uint8_t maskedByte2 = rawString[(cursor + 2) % numOctets] & lowOctetBitmask;
-	uint8_t maskedByte3 = rawString[(cursor + 3) % numOctets] & lowOctetBitmask;
+
+	uint8_t modulusOperand = numOctets + 1;
+	size_t offset1 = cursor + (1 % modulusOperand);
+	size_t offset2 = cursor + (2 % modulusOperand);
+	size_t offset3 = cursor + (3 % modulusOperand);
+
+	uint8_t maskedByte1 = rawString[offset1] & lowOctetBitmask;
+	uint8_t maskedByte2 = rawString[offset2] & lowOctetBitmask;
+	uint8_t maskedByte3 = rawString[offset3] & lowOctetBitmask;
 
 	switch (numOctets)
 	{
