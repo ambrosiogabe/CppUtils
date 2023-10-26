@@ -93,14 +93,566 @@ namespace StringTestSuite
 		END_TEST;
 	}
 
+	// Make iter tests
+	DEFINE_TEST(utf8Iter_MakeIterShouldStartAt0_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		auto iter = String::makeIter(rawStringLiteral, sizeof(rawStringLiteral) - 1);
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MakeIterShouldStartAt0_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
+		auto iter = String::makeIter(rawStringLiteral, sizeof(rawStringLiteral) - 1);
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MakeIterShouldStartAtFirstValidBoundary_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, 1);
+
+		ASSERT_EQUAL(iter.bytePos, 1);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MakeIterShouldStartAtFirstValidBoundary_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, 1);
+
+		auto firstCharNumBytes = String::getNumOctets(rawStringLiteral, sizeof(rawStringLiteral) - 1, 0);
+
+		ASSERT_TRUE(firstCharNumBytes.hasValue());
+		ASSERT_EQUAL(iter.bytePos, firstCharNumBytes.value());
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MakeIterWithEmptyStringShouldBeFine)
+	{
+		const uint8_t rawStringLiteral[] = u8"";
+		auto iter = String::makeIter(rawStringLiteral, sizeof(rawStringLiteral) - 1);
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MakeIterWithOverflowShouldClamp)
+	{
+		const uint8_t rawStringLiteral[] = u8"Hello";
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, sizeof(rawStringLiteral));
+
+		ASSERT_EQUAL(iter.bytePos, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	// ++ operator tests
+	DEFINE_TEST(utf8Iter_IterIncrements1Char_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		auto iter = String::makeIter(rawStringLiteral, sizeof(rawStringLiteral) - 1);
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+
+		++iter;
+
+		auto firstCharNumBytes = String::getNumOctets(rawStringLiteral, sizeof(rawStringLiteral) - 1, 0);
+
+		ASSERT_TRUE(firstCharNumBytes.hasValue());
+		ASSERT_EQUAL(iter.bytePos, firstCharNumBytes.value());
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_IterIncrements1Char_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
+		auto iter = String::makeIter(rawStringLiteral, sizeof(rawStringLiteral) - 1);
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+
+		++iter;
+
+		auto firstCharNumBytes = String::getNumOctets(rawStringLiteral, sizeof(rawStringLiteral) - 1, 0);
+
+		ASSERT_TRUE(firstCharNumBytes.hasValue());
+		ASSERT_EQUAL(iter.bytePos, firstCharNumBytes.value());
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_IterIncrementsClampsWithOverflow_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		const size_t bytePosStart = sizeof(rawStringLiteral) - 1;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		++iter;
+
+		ASSERT_EQUAL(iter.bytePos, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_IterIncrementsClampsWithOverflow_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
+		const size_t bytePosStart = sizeof(rawStringLiteral) - 1;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		++iter;
+
+		ASSERT_EQUAL(iter.bytePos, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	// -- operator tests
+	DEFINE_TEST(utf8Iter_IterDecrements1Char_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		const size_t bytePosStart = 1;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		--iter;
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_IterDecrements1Char_WithUtf8)
+	{
+		// ∏ is 3 bytes long
+		const uint8_t rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
+		const size_t bytePosStart = 3;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		--iter;
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_IterDecrementsClampsWithUnderflow_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		const size_t bytePosStart = 0;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		--iter;
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_IterDecrementsClampsWithUnderflow_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"∏ Test some unicode strings ∏";
+		const size_t bytePosStart = 0;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		--iter;
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	// + operator tests
+	DEFINE_TEST(utf8Iter_PlusOperatorWithMultipleCharsIsValid_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		constexpr uint8_t bytePosStart = 4;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		const uint8_t numCharsToInc = 2;
+		uint8_t numBytesToInc = 0;
+		for (size_t i = 0; i < numCharsToInc; i++)
+		{
+			auto numBytes = String::getNumOctets(iter.data, sizeof(rawStringLiteral) - 1, bytePosStart + i);
+			ASSERT_TRUE(numBytes.hasValue());
+
+			numBytesToInc += numBytes.value();
+		}
+
+		iter = iter + numCharsToInc;
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart + numBytesToInc);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_PlusOperatorWithMultipleCharsIsValid_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test ∏some unicode strings";
+		constexpr uint8_t bytePosStart = 4;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		const uint8_t numCharsToInc = 2;
+		uint8_t numBytesToInc = 0;
+		for (size_t i = 0; i < numCharsToInc; i++)
+		{
+			auto numBytes = String::getNumOctets(iter.data, sizeof(rawStringLiteral) - 1, bytePosStart + i);
+			ASSERT_TRUE(numBytes.hasValue());
+
+			numBytesToInc += numBytes.value();
+		}
+
+		iter = iter + numCharsToInc;
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart + numBytesToInc);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_PlusOperatorOverflowClamps_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		constexpr uint8_t bytePosStart = sizeof(rawStringLiteral) - 1;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		iter = iter + 1;
+
+		ASSERT_EQUAL(iter.bytePos, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_PlusOperatorOverflowClamps_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test ∏some unicode strings";
+		constexpr uint8_t bytePosStart = sizeof(rawStringLiteral) - 1;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		iter = iter + 1;
+
+		ASSERT_EQUAL(iter.bytePos, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	// - operator tests
+	DEFINE_TEST(utf8Iter_MinusOperatorWithMultipleCharsIsValid_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		constexpr uint8_t bytePosStart = 6;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		const uint8_t numCharsToDec = 2;
+		uint8_t numBytesToDec = 2;
+
+		iter = iter - numCharsToDec;
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart - numBytesToDec);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MinusOperatorWithMultipleCharsIsValid_WithUtf8)
+	{
+		// NOTE: ∏ is 3 bytes long
+		const uint8_t rawStringLiteral[] = u8"Test ∏some unicode strings";
+		constexpr uint8_t bytePosStart = 8;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		const uint8_t numCharsToDec = 2;
+		uint8_t numBytesToDec = 4;
+
+		iter = iter - numCharsToDec;
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart - numBytesToDec);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MinusOperatorUnderflowClamps_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		constexpr uint8_t bytePosStart = 0;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		iter = iter - 1;
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MinusOperatorUnderflowClamps_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"∏Test some unicode strings";
+		constexpr uint8_t bytePosStart = 0;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		iter = iter - 1;
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	// += operator tests
+	DEFINE_TEST(utf8Iter_PlusEqualsOperatorWithMultipleCharsIsValid_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		constexpr uint8_t bytePosStart = 4;
+		auto controlIter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		const uint8_t numCharsToInc = 2;
+		// We know this operator works from previous tests so we can use it to compare if the += operator also works
+		controlIter = controlIter + numCharsToInc;
+		iter += numCharsToInc;
+
+		ASSERT_EQUAL(iter.bytePos, controlIter.bytePos);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_PlusEqualsOperatorWithMultipleCharsIsValid_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test ∏some unicode strings";
+		constexpr uint8_t bytePosStart = 4;
+		auto controlIter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		const uint8_t numCharsToInc = 2;
+		controlIter = controlIter + numCharsToInc;
+		iter += numCharsToInc;
+
+		ASSERT_EQUAL(iter.bytePos, controlIter.bytePos);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_PlusEqualsOperatorOverflowClamps_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		constexpr uint8_t bytePosStart = sizeof(rawStringLiteral) - 1;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		iter += 1;
+
+		ASSERT_EQUAL(iter.bytePos, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_PlusEqualsOperatorOverflowClamps_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test ∏some unicode strings";
+		constexpr uint8_t bytePosStart = sizeof(rawStringLiteral) - 1;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		iter += 1;
+
+		ASSERT_EQUAL(iter.bytePos, sizeof(rawStringLiteral) - 1);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	// -= operator tests
+	DEFINE_TEST(utf8Iter_MinusEqualsOperatorWithMultipleCharsIsValid_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		constexpr uint8_t bytePosStart = 6;
+		auto controlIter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		const uint8_t numCharsToDec = 2;
+		controlIter = controlIter - numCharsToDec;
+		iter -= numCharsToDec;
+
+		ASSERT_EQUAL(iter.bytePos, controlIter.bytePos);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MinusEqualsOperatorWithMultipleCharsIsValid_WithUtf8)
+	{
+		// NOTE: ∏ is 3 bytes long
+		const uint8_t rawStringLiteral[] = u8"Test ∏some unicode strings";
+		constexpr uint8_t bytePosStart = 8;
+		auto controlIter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		const uint8_t numCharsToDec = 2;
+
+		controlIter = controlIter - numCharsToDec;
+		iter -= numCharsToDec;
+
+		ASSERT_EQUAL(iter.bytePos, controlIter.bytePos);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MinusEqualsOperatorUnderflowClamps_WithAscii)
+	{
+		const uint8_t rawStringLiteral[] = u8"Test some unicode strings";
+		constexpr uint8_t bytePosStart = 0;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		iter -= 1;
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
+	DEFINE_TEST(utf8Iter_MinusEqualsOperatorUnderflowClamps_WithUtf8)
+	{
+		const uint8_t rawStringLiteral[] = u8"∏Test some unicode strings";
+		constexpr uint8_t bytePosStart = 0;
+		auto iter = String::makeIterFromBytePos(rawStringLiteral, sizeof(rawStringLiteral) - 1, bytePosStart);
+
+		ASSERT_EQUAL(iter.bytePos, bytePosStart);
+
+		iter -= 1;
+
+		ASSERT_EQUAL(iter.bytePos, 0);
+		ASSERT_EQUAL(iter.numBytes, sizeof(rawStringLiteral) - 1);
+
+		END_TEST;
+	}
+
 	void setupCppStringsTestSuite()
 	{
 		Tests::TestSuite& testSuite = Tests::addTestSuite("cppStrings.hpp");
 
+		// BasicString tests
 		ADD_TEST(testSuite, utf8String_C080_ShouldBeBad);
 		ADD_TEST(testSuite, utf8String_EDA18CEDBEB4_ShouldBeBad);
 		ADD_TEST(testSuite, validUtf8String_ShouldSucceed);
 		ADD_TEST(testSuite, validUtf8String_ShouldSucceedWithUnicodeChars);
+
+		// Make Iter tests
+		ADD_TEST(testSuite, utf8Iter_MakeIterShouldStartAt0_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_MakeIterShouldStartAt0_WithUtf8);
+		ADD_TEST(testSuite, utf8Iter_MakeIterShouldStartAtFirstValidBoundary_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_MakeIterShouldStartAtFirstValidBoundary_WithUtf8);
+		ADD_TEST(testSuite, utf8Iter_MakeIterWithEmptyStringShouldBeFine);
+		ADD_TEST(testSuite, utf8Iter_MakeIterWithOverflowShouldClamp);
+
+		// ++ operator tests
+		ADD_TEST(testSuite, utf8Iter_IterIncrements1Char_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_IterIncrements1Char_WithUtf8);
+		ADD_TEST(testSuite, utf8Iter_IterIncrementsClampsWithOverflow_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_IterIncrementsClampsWithOverflow_WithUtf8);
+
+		// -- operator tests
+		ADD_TEST(testSuite, utf8Iter_IterDecrements1Char_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_IterDecrements1Char_WithUtf8);
+		ADD_TEST(testSuite, utf8Iter_IterDecrementsClampsWithUnderflow_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_IterDecrementsClampsWithUnderflow_WithUtf8);
+
+		// + operator tests
+		ADD_TEST(testSuite, utf8Iter_PlusOperatorWithMultipleCharsIsValid_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_PlusOperatorWithMultipleCharsIsValid_WithUtf8);
+		ADD_TEST(testSuite, utf8Iter_PlusOperatorOverflowClamps_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_PlusOperatorOverflowClamps_WithUtf8);
+
+		// - operator tests
+		ADD_TEST(testSuite, utf8Iter_MinusOperatorWithMultipleCharsIsValid_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_MinusOperatorWithMultipleCharsIsValid_WithUtf8);
+		ADD_TEST(testSuite, utf8Iter_MinusOperatorUnderflowClamps_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_MinusOperatorUnderflowClamps_WithUtf8);
+
+		// += operator tests
+		ADD_TEST(testSuite, utf8Iter_PlusEqualsOperatorWithMultipleCharsIsValid_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_PlusEqualsOperatorWithMultipleCharsIsValid_WithUtf8);
+		ADD_TEST(testSuite, utf8Iter_PlusEqualsOperatorOverflowClamps_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_PlusEqualsOperatorOverflowClamps_WithUtf8);
+
+		// -= operator tests
+		ADD_TEST(testSuite, utf8Iter_MinusEqualsOperatorWithMultipleCharsIsValid_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_MinusEqualsOperatorWithMultipleCharsIsValid_WithUtf8);
+		ADD_TEST(testSuite, utf8Iter_MinusEqualsOperatorUnderflowClamps_WithAscii);
+		ADD_TEST(testSuite, utf8Iter_MinusEqualsOperatorUnderflowClamps_WithUtf8);
 	}
 }
 
@@ -124,10 +676,10 @@ namespace MaybeTestSuite
 // -------------------- Print Test Suite --------------------
 namespace PrintTestSuite
 {
-#include <Windows.h>
-#include <stdio.h>
-#include <io.h>
-#include <fcntl.h>
+	#include <Windows.h>
+	#include <stdio.h>
+	#include <io.h>
+	#include <fcntl.h>
 
 	static HANDLE pipeRead = NULL;
 	static HANDLE pipeWrite = NULL;
@@ -269,8 +821,8 @@ namespace PrintTestSuite
 
 	DEFINE_TEST(floatOutputIsSameAsPrintf)
 	{
-#pragma warning( push )
-#pragma warning( disable : 4616)
+		#pragma warning( push )
+		#pragma warning( disable : 4616)
 		float one = 1.0f;
 		float zero = 0.0f;
 		using TupleType = std::tuple<std::string, std::string, std::string, float>;
@@ -320,7 +872,7 @@ namespace PrintTestSuite
 			return res;
 		}
 
-#pragma warning( pop )
+		#pragma warning( pop )
 
 		END_TEST;
 	}
@@ -897,8 +1449,10 @@ using namespace CppUtilsTestSuite;
 
 struct Foo
 {
-	Foo(const std::string& str) 
-		: str(str) {}
+	Foo(const std::string& str)
+		: str(str)
+	{
+	}
 
 	~Foo()
 	{
@@ -925,14 +1479,14 @@ void mainFunc()
 	g_logger_set_log_directory("./logs");
 	g_memory_init_padding_zeroed(true, 1024, true);
 
-	constexpr bool runTests = false;
+	constexpr bool runTests = true;
 	if (runTests)
 	{
 		setupCppStringsTestSuite();
-		setupMaybeTestSuite();
-		setupPrintTestSuite();
-		setupThreadPoolTestSuite();
-		setupCppUtilsTestSuite();
+		//setupMaybeTestSuite();
+		//setupPrintTestSuite();
+		//setupThreadPoolTestSuite();
+		//setupCppUtilsTestSuite();
 
 		Tests::runTests();
 		Tests::free();
@@ -940,7 +1494,7 @@ void mainFunc()
 
 	IO::setBackgroundColor(ConsoleColor::BLACK);
 
-	constexpr bool testingCppUtils = true;
+	constexpr bool testingCppUtils = false;
 	constexpr bool testingCppPrint = false;
 
 	if (testingCppUtils)
